@@ -195,15 +195,22 @@ impl ToolHandler {
         let indexed_head = store.get_meta("git_head")?;
 
         match git::status(&repo) {
-            Ok(st) => Ok(json!({
-                "project": project,
-                "dirty": st.dirty,
-                "head": st.head,
-                "indexed_head": indexed_head,
-                "head_changed": indexed_head.as_ref().zip(st.head.as_ref()).map(|(a, b)| a != b).unwrap_or(false),
-                "changed_files": st.changed_files,
-                "deleted_files": st.deleted_files,
-            })),
+            Ok(st) => {
+                let changed =
+                    git::collect_incremental_paths(&repo, indexed_head.as_deref(), &st);
+                let hash_drift = store.files_with_fingerprint_drift(&repo).unwrap_or_default();
+                Ok(json!({
+                    "project": project,
+                    "dirty": st.dirty,
+                    "head": st.head,
+                    "indexed_head": indexed_head,
+                    "head_changed": indexed_head.as_ref().zip(st.head.as_ref()).map(|(a, b)| a != b).unwrap_or(false),
+                    "changed_files": changed,
+                    "deleted_files": st.deleted_files,
+                    "hash_drift_files": hash_drift,
+                    "needs_reindex": !changed.is_empty() || !hash_drift.is_empty(),
+                }))
+            }
             Err(e) => Ok(json!({
                 "project": project,
                 "dirty": false,

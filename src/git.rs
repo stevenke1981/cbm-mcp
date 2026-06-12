@@ -78,6 +78,29 @@ pub fn status(path: &Path) -> Result<GitStatus> {
     })
 }
 
+/// Merge porcelain dirty files with `git diff --name-only` when HEAD moved since last index.
+pub fn collect_incremental_paths(
+    repo_path: &Path,
+    indexed_head: Option<&str>,
+    git: &GitStatus,
+) -> Vec<String> {
+    let mut files = git.changed_files.clone();
+    if let (Some(old), Some(new)) = (indexed_head, git.head.as_deref()) {
+        if old != new {
+            if let Ok(diff) = diff_changed_files(repo_path, old, new) {
+                for f in diff {
+                    if !files.contains(&f) {
+                        files.push(f);
+                    }
+                }
+            }
+        }
+    }
+    files.sort();
+    files.dedup();
+    files
+}
+
 pub fn diff_changed_files(path: &Path, old_head: &str, new_head: &str) -> Result<Vec<String>> {
     let out = Command::new("git")
         .args([
@@ -103,6 +126,51 @@ pub fn diff_changed_files(path: &Path, old_head: &str, new_head: &str) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collect_incremental_paths_merges_head_diff() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        std::fs::write(dir.path().join("a.rs"), "fn a() {}\n").unwrap();
+        std::fs::write(dir.path().join("b.rs"), "fn b() {}\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "v1"])
+            .current_dir(dir.path())
+            .env("GIT_AUTHOR_NAME", "test")
+            .env("GIT_AUTHOR_EMAIL", "t@t.com")
+            .env("GIT_COMMITTER_NAME", "test")
+            .env("GIT_COMMITTER_EMAIL", "t@t.com")
+            .output()
+            .unwrap();
+        let head_v1 = head_sha(dir.path()).unwrap().unwrap();
+        std::fs::write(dir.path().join("b.rs"), "fn b2() {}\n").unwrap();
+        std::process::Command::new("git")
+            .args(["add", "b.rs"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-m", "v2"])
+            .current_dir(dir.path())
+            .env("GIT_AUTHOR_NAME", "test")
+            .env("GIT_AUTHOR_EMAIL", "t@t.com")
+            .env("GIT_COMMITTER_NAME", "test")
+            .env("GIT_COMMITTER_EMAIL", "t@t.com")
+            .output()
+            .unwrap();
+        let st = status(dir.path()).unwrap();
+        let files = collect_incremental_paths(dir.path(), Some(&head_v1), &st);
+        assert!(files.iter().any(|f| f == "b.rs"));
+    }
 
     #[test]
     fn parses_porcelain_paths() {

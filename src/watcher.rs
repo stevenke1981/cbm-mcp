@@ -281,21 +281,11 @@ fn should_reindex(state: &WatchState, git: &GitStatus, signature: &str) -> bool 
 }
 
 fn collect_changed_files(state: &WatchState, git: &GitStatus) -> Vec<String> {
-    let mut files = git.changed_files.clone();
-    if let (Some(old), Some(new)) = (&state.last_head, &git.head) {
-        if old != new {
-            if let Ok(diff) = git::diff_changed_files(&state.repo_path, old, new) {
-                for f in diff {
-                    if !files.contains(&f) {
-                        files.push(f);
-                    }
-                }
-            }
-        }
-    }
-    files.sort();
-    files.dedup();
-    files
+    git::collect_incremental_paths(
+        &state.repo_path,
+        state.last_head.as_deref(),
+        git,
+    )
 }
 
 impl Default for Watcher {

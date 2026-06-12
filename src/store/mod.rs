@@ -115,6 +115,23 @@ impl Store {
 
     fn init_schema(&self) -> Result<()> {
         self.conn.execute_batch(SCHEMA_SQL)?;
+        self.migrate_files_fingerprint_columns()?;
+        Ok(())
+    }
+
+    fn migrate_files_fingerprint_columns(&self) -> Result<()> {
+        let mut stmt = self.conn.prepare("PRAGMA table_info(files)")?;
+        let cols = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        if !cols.iter().any(|c| c == "mtime_ns") {
+            self.conn
+                .execute("ALTER TABLE files ADD COLUMN mtime_ns INTEGER", [])?;
+        }
+        if !cols.iter().any(|c| c == "size_bytes") {
+            self.conn
+                .execute("ALTER TABLE files ADD COLUMN size_bytes INTEGER", [])?;
+        }
         Ok(())
     }
 
@@ -334,19 +351,60 @@ impl Store {
     pub fn upsert_file(&self, file: &SourceFile) -> Result<()> {
         let stored_content = codec::maybe_compress(&file.content);
         self.conn.execute(
-            "INSERT INTO files (path, project, content, language, line_count)
-             VALUES (?1, ?2, ?3, ?4, ?5)
+            "INSERT INTO files (path, project, content, language, line_count, mtime_ns, size_bytes)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(path, project) DO UPDATE SET
-               content=excluded.content, language=excluded.language, line_count=excluded.line_count",
+               content=excluded.content,
+               language=excluded.language,
+               line_count=excluded.line_count,
+               mtime_ns=excluded.mtime_ns,
+               size_bytes=excluded.size_bytes",
             params![
                 file.path,
                 self.project,
                 stored_content,
                 file.language,
                 file.line_count,
+                file.mtime_ns,
+                file.size_bytes,
             ],
         )?;
         Ok(())
+    }
+
+    /// Files whose on-disk mtime/size differ from the last indexed fingerprint.
+    pub fn files_with_fingerprint_drift(&self, repo_path: &std::path::Path) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path, mtime_ns, size_bytes FROM files WHERE project = ?1",
+        )?;
+        let rows = stmt
+            .query_map(params![self.project], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<i64>>(1)?,
+                    row.get::<_, Option<i64>>(2)?,
+                ))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        let mut drifted = Vec::new();
+        for (rel, stored_mtime, stored_size) in rows {
+            let (Some(stored_mtime), Some(stored_size)) = (stored_mtime, stored_size) else {
+                continue;
+            };
+            let abs = repo_path.join(&rel);
+            if !abs.is_file() {
+                drifted.push(rel);
+                continue;
+            }
+            let fp = crate::file_fingerprint::fingerprint(&abs)?;
+            if fp.mtime_ns != stored_mtime || fp.size_bytes != stored_size {
+                drifted.push(rel);
+            }
+        }
+        drifted.sort();
+        drifted.dedup();
+        Ok(drifted)
     }
 
     pub fn set_meta(&self, key: &str, value: &str) -> Result<()> {
@@ -953,9 +1011,10 @@ impl Store {
     }
 
     pub fn list_files(&self) -> Result<Vec<SourceFile>> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT path, content, language, line_count FROM files WHERE project = ?1")?;
+        let mut stmt = self.conn.prepare(
+            "SELECT path, content, language, line_count, mtime_ns, size_bytes
+             FROM files WHERE project = ?1",
+        )?;
         let rows = stmt
             .query_map(params![self.project], |row| {
                 let stored: String = row.get(1)?;
@@ -964,6 +1023,8 @@ impl Store {
                     content: read_file_content(&stored),
                     language: row.get(2)?,
                     line_count: row.get(3)?,
+                    mtime_ns: row.get(4)?,
+                    size_bytes: row.get(5)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1314,6 +1375,8 @@ mod tests {
                 content: content.clone(),
                 language: "python".into(),
                 line_count: 400,
+                mtime_ns: None,
+                size_bytes: None,
             })
             .unwrap();
         assert_eq!(store.list_files().unwrap()[0].content, content);

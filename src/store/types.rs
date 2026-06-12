@@ -28,6 +28,10 @@ pub struct SourceFile {
     pub content: String,
     pub language: String,
     pub line_count: i64,
+    #[serde(default)]
+    pub mtime_ns: Option<i64>,
+    #[serde(default)]
+    pub size_bytes: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

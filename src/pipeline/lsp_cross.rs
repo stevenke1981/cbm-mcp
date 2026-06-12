@@ -674,6 +674,8 @@ mod tests {
             content: "from greeter import Greeter\n\ndef main():\n    Greeter().greet()\n"
                 .into(),
             line_count: 4,
+            mtime_ns: None,
+            size_bytes: None,
         }];
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);
@@ -694,6 +696,8 @@ mod tests {
             content: "import { Greeter } from './greeter';\n\nfunction main() {\n  new Greeter().greet();\n}\n"
                 .into(),
             line_count: 5,
+            mtime_ns: None,
+            size_bytes: None,
         }];
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);
@@ -714,6 +718,8 @@ mod tests {
             content: "import greeter.Greeter;\n\nclass Main {\n  void main() {\n    new Greeter().greet();\n  }\n}\n"
                 .into(),
             line_count: 7,
+            mtime_ns: None,
+            size_bytes: None,
         }];
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);
@@ -734,6 +740,8 @@ mod tests {
             content: "<?php\nuse Greeter\\Greeter;\n\nfunction main() {\n    (new Greeter())->greet();\n}\n"
                 .into(),
             line_count: 6,
+            mtime_ns: None,
+            size_bytes: None,
         }];
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);
@@ -754,6 +762,8 @@ mod tests {
             content: "package main\n\nimport \"greeter\"\n\nfunc main() {\n  g := greeter.NewGreeter()\n  g.Greet()\n}\n"
                 .into(),
             line_count: 8,
+            mtime_ns: None,
+            size_bytes: None,
         }];
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);

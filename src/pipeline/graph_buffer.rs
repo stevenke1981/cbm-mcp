@@ -212,6 +212,8 @@ mod tests {
             content: "fn main() {}".into(),
             language: "rust".into(),
             line_count: 1,
+            mtime_ns: None,
+            size_bytes: None,
         });
         buf.upsert_symbol(sym("main.rs", "main", 1));
         buf.insert_edge(Edge {

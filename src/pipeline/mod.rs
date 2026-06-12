@@ -202,13 +202,22 @@ impl Pipeline {
         if incremental {
             if let Ok(store) = Store::open(&project_name) {
                 if store.get_project().is_ok() {
-                    let git_status = git::status(&repo_path)?;
-                    if !git_status.changed_files.is_empty() {
-                        return self.run_incremental(
-                            &repo_path,
-                            &project_name,
-                            &git_status.changed_files,
-                        );
+                    let indexed_head = store.get_meta("git_head")?;
+                    let git_status = if git::is_repo(&repo_path) {
+                        git::status(&repo_path)?
+                    } else {
+                        git::GitStatus::default()
+                    };
+                    let mut changed = git::collect_incremental_paths(
+                        &repo_path,
+                        indexed_head.as_deref(),
+                        &git_status,
+                    );
+                    if changed.is_empty() {
+                        changed = store.files_with_fingerprint_drift(&repo_path)?;
+                    }
+                    if !changed.is_empty() {
+                        return self.run_incremental(&repo_path, &project_name, &changed);
                     }
                 }
             }
@@ -357,11 +366,14 @@ impl Pipeline {
     fn index_file(&self, file: &DiscoveredFile) -> Result<FileIndexResult> {
         let content = std::fs::read_to_string(&file.path)?;
         let line_count = content.lines().count() as i64;
+        let fp = crate::file_fingerprint::fingerprint(&file.path).ok();
         let source_file = SourceFile {
             path: file.relative_path.clone(),
             content: content.clone(),
             language: file.language.clone(),
             line_count,
+            mtime_ns: fp.map(|f| f.mtime_ns),
+            size_bytes: fp.map(|f| f.size_bytes),
         };
 
         let symbols = extract_symbols(&file.relative_path, &file.language, &content)?;

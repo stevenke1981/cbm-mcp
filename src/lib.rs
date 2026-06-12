@@ -2,6 +2,7 @@ pub mod agent;
 pub mod cli;
 pub mod discover;
 pub mod error;
+pub mod file_fingerprint;
 pub mod git;
 pub mod hooks;
 pub mod http;

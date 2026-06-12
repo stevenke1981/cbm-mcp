@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** incremental index · artifact export/restore · MCP tool schema lock per tool.
+**Next P0 slices:** artifact export/restore · MCP tool schema lock per tool · dependency-edge invalidation.
 
-**Done recently:** MCP JSON-RPC error codes (-32700/-32601) + tool `isError` results · CALLS negative fixtures · PHP require/autoload · CALLS confidence metadata · C# CALLS AST.
+**Done recently:** incremental index (HEAD diff + mtime/size fingerprint drift + `run_smart`) · MCP JSON-RPC error codes · CALLS negative fixtures.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -151,11 +151,11 @@ Acceptance criteria:
   - duration
   - memory high-water mark
 - [ ] Add pass-level failure isolation and diagnostics.
-- [ ] Add incremental indexing with changed-file invalidation by:
-  - git HEAD
-  - dirty file set
-  - file hash
-  - dependency edges where available
+- [~] Add incremental indexing with changed-file invalidation by:
+  - [x] git HEAD (`collect_incremental_paths` + watcher/`run_smart`)
+  - [x] dirty file set (porcelain + HEAD diff merge)
+  - [x] file hash (mtime_ns + size_bytes fingerprints in `files` table)
+  - [ ] dependency edges where available
 - [ ] Ensure `.gitignore` and `.cbmignore` behavior matches reference.
 
 Acceptance criteria:
