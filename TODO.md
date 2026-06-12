@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** artifact export/restore · MCP tool schema lock per tool · dependency-edge invalidation.
+**Next P0 slices:** MCP tool schema lock per tool · dependency-edge invalidation · read-only store mode.
 
-**Done recently:** incremental index (HEAD diff + mtime/size fingerprint drift + `run_smart`) · MCP JSON-RPC error codes · CALLS negative fixtures.
+**Done recently:** artifact export/restore parity (`artifact.json`, schema_version, integrity gate) · incremental index · MCP JSON-RPC error codes.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -109,11 +109,12 @@ Acceptance criteria:
   - batch writes skip nested transactions during bulk mode
   - full index wrapped in single transaction (`pipeline::run_full`)
 - [x] Add rollback tests for partial index failure (`tests/store_bulk_write_test.rs`).
-- [ ] Match `.codebase-memory/graph.db.zst` artifact behavior:
-  - export
-  - restore
-  - skip restore when cache exists
-  - validate checksum/version if reference supports it
+- [~] Match `.codebase-memory/graph.db.zst` artifact behavior:
+  - [x] export (zstd + `artifact.json` metadata)
+  - [x] restore (decompress + integrity_check + atomic rename)
+  - [x] skip restore when cache exists (`try_restore`)
+  - [x] validate schema_version + original_size on import
+  - [ ] `.gitattributes` merge driver setup (reference optional)
 - [ ] Add read-only store mode for query operations.
 - [ ] Add integrity check command or internal gate for release smoke.
 - [ ] Confirm cache environment variables:

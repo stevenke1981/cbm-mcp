@@ -466,6 +466,16 @@ impl Store {
             .map_err(Into::into)
     }
 
+    pub fn count_edges(&self) -> Result<i64> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM edges WHERE project = ?1",
+                params![self.project],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
     pub fn find_symbol(&self, qn: &str) -> Result<Option<Symbol>> {
         self.conn
             .query_row(
