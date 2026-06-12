@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
-use crate::mcp::tools::{tool_definitions, ToolHandler};
+use crate::mcp::tool_specs::tool_definitions;
+use crate::mcp::tools::ToolHandler;
 use crate::mcp::transport::{read_stdin_message, write_stdout_message};
 use crate::watcher::Watcher;
 use serde_json::{json, Value};

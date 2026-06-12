@@ -31,9 +31,9 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw "cargo build --release failed" }
 }
 
-$Bin = Join-Path $Root "target\release\cbrlm.exe"
+$Bin = Join-Path $Root "target\release\codebase-memory-mcp.exe"
 if (-not (Test-Path $Bin)) {
-    $Bin = Join-Path $Root "target\release\cbrlm"
+    $Bin = Join-Path $Root "target\release\codebase-memory-mcp"
 }
 if (-not (Test-Path $Bin)) {
     throw "release binary not found; run without -SkipBuild"
@@ -42,7 +42,7 @@ if (-not (Test-Path $Bin)) {
 function Invoke-CbrlmCli([string[]]$CliArgs) {
     $out = & $Bin @CliArgs 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
-        throw "cbrlm cli failed: $($CliArgs -join ' ')`n$out"
+        throw "codebase-memory-mcp cli failed: $($CliArgs -join ' ')`n$out"
     }
     return $out
 }
@@ -50,7 +50,7 @@ function Invoke-CbrlmCli([string[]]$CliArgs) {
 function Invoke-CbrlmCliStdout([string[]]$CliArgs) {
     $out = & $Bin @CliArgs 2>$null
     if ($LASTEXITCODE -ne 0) {
-        throw "cbrlm cli failed: $($CliArgs -join ' ')"
+        throw "codebase-memory-mcp cli failed: $($CliArgs -join ' ')"
     }
     return ($out | Out-String).Trim()
 }

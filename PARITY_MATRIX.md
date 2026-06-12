@@ -1,4 +1,4 @@
-# CBRLM Rust Parity Matrix
+# codebase-memory-mcp Rust Parity Matrix
 
 Status key: **Done** | **Partial** | **MVP** | **Not started** | **Omitted**
 
@@ -19,7 +19,7 @@ Last updated: 2026-06-12 (Section 7 review applied).
 
 ## Core platform
 
-| Feature | Reference | Rust (`cbrlm`) | Status |
+| Feature | Reference | Rust (`codebase-memory-mcp`) | Status |
 |---------|-----------|----------------|--------|
 | MCP stdio server | Yes | Yes | Done |
 | CLI tool dispatch | Yes | Yes (`cbrlm cli --json --quiet`) | Done |

@@ -177,7 +177,7 @@ fn mcp_tools_call_index_and_search() {
         "method": "tools/call",
         "params": {
             "name": "get_graph_schema",
-            "arguments": {}
+            "arguments": { "project": "mcp-test" }
         }
     });
     let resp = server

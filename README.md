@@ -65,7 +65,7 @@ See [`packaging/mcp/dual-servers.example.json`](packaging/mcp/dual-servers.examp
 
 ## Full clone status
 
-Rust MVP toward full reference parity with `D:\_cbm-ref`. See [`CLONE_ROADMAP.md`](CLONE_ROADMAP.md) and [`PARITY_MATRIX.md`](PARITY_MATRIX.md).
+Rust MVP toward full reference parity with `D:\_cbm-ref`. See [`TODO.md`](TODO.md), [`CLONE_ROADMAP.md`](CLONE_ROADMAP.md), and [`PARITY_MATRIX.md`](PARITY_MATRIX.md).
 
 ## Environment
 

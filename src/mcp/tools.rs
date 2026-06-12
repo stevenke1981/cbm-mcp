@@ -25,7 +25,7 @@ impl ToolHandler {
             "search_graph" => self.search_graph(args),
             "trace_path" => self.trace_path(args),
             "get_code_snippet" => self.get_code_snippet(args),
-            "get_graph_schema" => Ok(json!(Store::open_memory()?.get_schema())),
+            "get_graph_schema" => self.get_graph_schema(args),
             "get_architecture" => self.get_architecture(args),
             "search_code" => self.search_code(args),
             "list_projects" => self.list_projects(),
@@ -113,19 +113,17 @@ impl ToolHandler {
     }
 
     fn get_code_snippet(&self, args: &Value) -> Result<Value> {
-        let project = args
-            .get("project")
-            .and_then(|v| v.as_str())
-            .map(normalize_project_name)
-            .unwrap_or_default();
+        let project = normalize_project_name(Self::require_str(args, "project")?);
         let qn = Self::require_str(args, "qualified_name")?;
-        let store = if project.is_empty() {
-            find_symbol_any_project(qn)?
-        } else {
-            Store::open(&project)?
-        };
+        let store = Store::open(&project)?;
         let snippet = store.get_snippet(qn)?;
         Ok(serde_json::to_value(snippet)?)
+    }
+
+    fn get_graph_schema(&self, args: &Value) -> Result<Value> {
+        let project = normalize_project_name(Self::require_str(args, "project")?);
+        let store = Store::open(&project)?;
+        Ok(json!(store.get_schema()))
     }
 
     fn get_architecture(&self, args: &Value) -> Result<Value> {
@@ -137,11 +135,7 @@ impl ToolHandler {
 
     fn search_code(&self, args: &Value) -> Result<Value> {
         let project = normalize_project_name(Self::require_str(args, "project")?);
-        let pattern = args
-            .get("pattern")
-            .and_then(|v| v.as_str())
-            .or_else(|| args.get("query").and_then(|v| v.as_str()))
-            .unwrap_or("");
+        let pattern = Self::require_str(args, "pattern")?;
         let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
         let store = Store::open(&project)?;
         let matches = store.search_code(pattern, limit)?;
@@ -180,14 +174,8 @@ impl ToolHandler {
 
     fn query_graph(&self, args: &Value) -> Result<Value> {
         let query = Self::require_str(args, "query")?;
-        let project = args
-            .get("project")
-            .and_then(|v| v.as_str())
-            .map(normalize_project_name);
-        let store = match project {
-            Some(p) => Store::open(&p)?,
-            None => Store::open_memory()?,
-        };
+        let project = normalize_project_name(Self::require_str(args, "project")?);
+        let store = Store::open(&project)?;
         let result = store.query_select(query)?;
         Ok(serde_json::to_value(result)?)
     }
@@ -254,7 +242,11 @@ impl ToolHandler {
 
     fn manage_adr(&self, args: &Value) -> Result<Value> {
         let project = normalize_project_name(Self::require_str(args, "project")?);
-        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("get");
+        let action = args
+            .get("mode")
+            .or_else(|| args.get("action"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("get");
         let store = Store::open(&project)?;
         match action {
             "set" => {
@@ -326,200 +318,6 @@ fn parse_search_filter(args: &Value) -> SearchFilter {
     }
 }
 
-fn find_symbol_any_project(qn: &str) -> Result<Store> {
-    for project in Store::list_projects()? {
-        let store = Store::open(&project.name)?;
-        if store.find_symbol(qn)?.is_some() {
-            return Ok(store);
-        }
-    }
-    Err(Error::SymbolNotFound(qn.to_string()))
-}
-
-pub fn tool_definitions() -> Vec<Value> {
-    vec![
-        tool_def(
-            "index_repository",
-            "Index a repository into the knowledge graph.",
-            json!({
-                "type": "object",
-                "required": ["repo_path"],
-                "properties": {
-                    "repo_path": { "type": "string" },
-                    "project": { "type": ["string", "null"] },
-                    "mode": { "type": ["string", "null"], "enum": ["full", "moderate", "fast"] },
-                    "incremental": { "type": ["boolean", "null"], "default": false },
-                    "persistence": { "type": ["boolean", "null"] }
-                }
-            }),
-        ),
-        tool_def(
-            "search_graph",
-            "Search the code knowledge graph.",
-            search_schema(),
-        ),
-        tool_def(
-            "trace_path",
-            "Trace call paths via BFS.",
-            json!({
-                "type": "object",
-                "required": ["project", "function_name"],
-                "properties": {
-                    "project": { "type": "string" },
-                    "function_name": { "type": "string" },
-                    "direction": { "type": "string", "default": "both" },
-                    "depth": { "type": "integer", "default": 3 }
-                }
-            }),
-        ),
-        tool_def(
-            "get_code_snippet",
-            "Read source code for a symbol.",
-            json!({
-                "type": "object",
-                "required": ["qualified_name"],
-                "properties": {
-                    "project": { "type": "string" },
-                    "qualified_name": { "type": "string" }
-                }
-            }),
-        ),
-        tool_def(
-            "get_graph_schema",
-            "Return graph schema.",
-            json!({ "type": "object", "properties": {} }),
-        ),
-        tool_def(
-            "get_architecture",
-            "Architecture overview.",
-            json!({
-                "type": "object",
-                "required": ["project"],
-                "properties": { "project": { "type": "string" } }
-            }),
-        ),
-        tool_def(
-            "search_code",
-            "Full-text code search.",
-            json!({
-                "type": "object",
-                "required": ["project"],
-                "properties": {
-                    "project": { "type": "string" },
-                    "pattern": { "type": "string" },
-                    "query": { "type": "string" },
-                    "limit": { "type": "integer", "default": 20 }
-                }
-            }),
-        ),
-        tool_def(
-            "list_projects",
-            "List indexed projects.",
-            json!({ "type": "object", "properties": {} }),
-        ),
-        tool_def(
-            "delete_project",
-            "Delete project index.",
-            json!({
-                "type": "object",
-                "required": ["project"],
-                "properties": { "project": { "type": "string" } }
-            }),
-        ),
-        tool_def(
-            "index_status",
-            "Index status query.",
-            json!({
-                "type": "object",
-                "required": ["project"],
-                "properties": { "project": { "type": "string" } }
-            }),
-        ),
-        tool_def(
-            "query_graph",
-            "SQL SELECT on graph tables.",
-            json!({
-                "type": "object",
-                "required": ["query"],
-                "properties": {
-                    "query": { "type": "string" },
-                    "project": { "type": "string" }
-                }
-            }),
-        ),
-        tool_def(
-            "detect_changes",
-            "Detect git changes.",
-            json!({
-                "type": "object",
-                "required": ["project"],
-                "properties": { "project": { "type": "string" } }
-            }),
-        ),
-        tool_def(
-            "manage_adr",
-            "Architecture Decision Record CRUD.",
-            json!({
-                "type": "object",
-                "required": ["project"],
-                "properties": {
-                    "project": { "type": "string" },
-                    "action": { "type": "string", "enum": ["get", "set", "delete"] },
-                    "content": { "type": "string" }
-                }
-            }),
-        ),
-        tool_def(
-            "ingest_traces",
-            "Ingest runtime traces as RUNTIME_TRACE edges.",
-            json!({
-                "type": "object",
-                "required": ["project", "traces"],
-                "properties": {
-                    "project": { "type": "string" },
-                    "traces": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "caller": { "type": "string" },
-                                "callee": { "type": "string" },
-                                "from": { "type": "string" },
-                                "to": { "type": "string" }
-                            }
-                        }
-                    }
-                }
-            }),
-        ),
-    ]
-}
-
-fn search_schema() -> Value {
-    json!({
-        "type": "object",
-        "required": ["project"],
-        "properties": {
-            "project": { "type": "string" },
-            "query": { "type": ["string", "null"] },
-            "vector_query": { "type": ["string", "null"], "description": "Semantic vector search (requires CBRLM_SEMANTIC_ENABLED=1)" },
-            "semantic_query": { "type": ["string", "null"] },
-            "label": { "type": ["string", "null"] },
-            "name_pattern": { "type": ["string", "null"], "description": "Regex pattern matched against symbol name" },
-            "qn_pattern": { "type": ["string", "null"], "description": "Regex pattern matched against qualified_name" },
-            "file_pattern": { "type": ["string", "null"], "description": "Glob pattern matched against file_path" },
-            "relationship": { "type": ["string", "null"], "description": "Edge type filter, e.g. CALLS, IMPORTS, CONTAINS" },
-            "direction": { "type": ["string", "null"], "enum": ["inbound", "outbound", "any"], "default": "any" },
-            "min_degree": { "type": ["integer", "null"] },
-            "max_degree": { "type": ["integer", "null"] },
-            "include_connected": { "type": "boolean", "default": false },
-            "exclude_entry_points": { "type": "boolean", "default": false },
-            "limit": { "type": "integer", "default": 200 },
-            "offset": { "type": "integer", "default": 0 }
-        }
-    })
-}
-
 struct PipelineGuard {
     busy: Arc<std::sync::atomic::AtomicBool>,
 }
@@ -537,10 +335,4 @@ impl Drop for PipelineGuard {
     }
 }
 
-fn tool_def(name: &str, description: &str, schema: Value) -> Value {
-    json!({
-        "name": name,
-        "description": description,
-        "inputSchema": schema
-    })
-}
+
