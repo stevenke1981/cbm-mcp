@@ -127,7 +127,7 @@ These are **not done** and should not be inferred from MVP completion:
 |------|----------|-------|
 | Leiden / Louvain communities | P2 | Replace connected-components MVP |
 | `HTTP_CALLS` pass | P2 | Client fetch/axios/reqwest edges |
-| Store bulk transaction API | P1 | Rollback + bulk pragma mode |
+| Store bulk transaction API | Partial | Full index uses bulk tx + rollback; graph buffer staging pending |
 | Multi-language AST-aware CALLS | P1 | Python, JS/TS, Go, Java, C/C++ |
 | Tree-sitter coverage gaps | P1 | Kotlin, Ruby, … |
 | FoundationDB backend | — | Omitted; SQLite is canonical |
@@ -142,5 +142,5 @@ A new agent should treat these as blockers before claiming equivalence with the 
 1. Regex/heuristic graph passes (imports, inheritance, most CALLS).
 2. Community detection is connected-components, not modularity optimization.
 3. HTTP routes are pattern-limited; no `HTTP_CALLS`.
-4. Store lacks bulk-index transaction staging.
+4. Graph buffer staging layer not yet implemented (bulk tx covers full-index atomicity).
 5. FoundationDB and reference C foundation layer omitted by design.

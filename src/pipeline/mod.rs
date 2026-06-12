@@ -241,14 +241,17 @@ impl Pipeline {
         let files = discover(repo_path, self.mode)?;
         let budget = crate::runtime::budget::MemoryBudget::from_env();
         let store = Store::open(project_name)?;
-        store.clear_project_data()?;
-        store.upsert_project(repo_path.to_string_lossy().as_ref())?;
-        store.set_meta("index_mode", &format!("{:?}", self.mode).to_lowercase())?;
-        if let Ok(Some(head)) = git::head_sha(repo_path) {
-            store.set_meta("git_head", &head)?;
-        }
+        store.begin_bulk_write()?;
 
-        let file_results: Vec<FileIndexResult> = files
+        let index_result = (|| -> Result<IndexResult> {
+            store.clear_project_data()?;
+            store.upsert_project(repo_path.to_string_lossy().as_ref())?;
+            store.set_meta("index_mode", &format!("{:?}", self.mode).to_lowercase())?;
+            if let Ok(Some(head)) = git::head_sha(repo_path) {
+                store.set_meta("git_head", &head)?;
+            }
+
+            let file_results: Vec<FileIndexResult> = files
             .par_iter()
             .filter_map(|file| {
                 let size = file.path.metadata().map(|m| m.len() as usize).unwrap_or(0);
@@ -270,46 +273,58 @@ impl Pipeline {
             })
             .collect();
 
-        let mut all_symbols = Vec::new();
-        for result in &file_results {
-            all_symbols.extend(result.symbols.clone());
-            store.upsert_file(&result.source_file)?;
+            let mut all_symbols = Vec::new();
+            for result in &file_results {
+                all_symbols.extend(result.symbols.clone());
+                store.upsert_file(&result.source_file)?;
+            }
+
+            store.upsert_symbols_batch(&all_symbols)?;
+            let (call_edges, semantic) = finalize_index(&store, repo_path, project_name, self.mode)?;
+            store.set_meta("semantic_enabled", &semantic::is_enabled().to_string())?;
+
+            let duration_ms = start.elapsed().as_millis() as u64;
+            info!(
+                project = %project_name,
+                files = file_results.len(),
+                symbols = all_symbols.len(),
+                edges = call_edges,
+                semantic_edges = semantic.similar_edges + semantic.semantically_related_edges,
+                duration_ms,
+                "index complete (pending commit)"
+            );
+
+            Ok(IndexResult {
+                success: true,
+                project: project_name.to_string(),
+                repo_path: repo_path.to_string_lossy().to_string(),
+                mode: format!("{:?}", self.mode).to_lowercase(),
+                incremental: false,
+                files_indexed: file_results.len(),
+                symbols_extracted: all_symbols.len(),
+                edges_extracted: call_edges,
+                semantic_edges: semantic.similar_edges + semantic.semantically_related_edges,
+                vectors_stored: semantic.vectors_stored,
+                duration_ms,
+                artifact_path: None,
+                restored_from_artifact: false,
+            })
+        })();
+
+        match index_result {
+            Ok(mut result) => {
+                store.commit_bulk_write()?;
+                store.checkpoint()?;
+                let artifact_path =
+                    maybe_export_artifact(repo_path, project_name, &store, self.export_artifact)?;
+                result.artifact_path = artifact_path.map(|p| p.display().to_string());
+                Ok(result)
+            }
+            Err(e) => {
+                store.rollback_bulk_write()?;
+                Err(e)
+            }
         }
-
-        store.upsert_symbols_batch(&all_symbols)?;
-        let (call_edges, semantic) = finalize_index(&store, repo_path, project_name, self.mode)?;
-        store.set_meta("semantic_enabled", &semantic::is_enabled().to_string())?;
-        store.checkpoint()?;
-        let artifact_path =
-            maybe_export_artifact(repo_path, project_name, &store, self.export_artifact)?;
-
-        let duration_ms = start.elapsed().as_millis() as u64;
-        info!(
-            project = %project_name,
-            files = file_results.len(),
-            symbols = all_symbols.len(),
-            edges = call_edges,
-            semantic_edges = semantic.similar_edges + semantic.semantically_related_edges,
-            duration_ms,
-            artifact = ?artifact_path,
-            "index complete"
-        );
-
-        Ok(IndexResult {
-            success: true,
-            project: project_name.to_string(),
-            repo_path: repo_path.to_string_lossy().to_string(),
-            mode: format!("{:?}", self.mode).to_lowercase(),
-            incremental: false,
-            files_indexed: file_results.len(),
-            symbols_extracted: all_symbols.len(),
-            edges_extracted: call_edges,
-            semantic_edges: semantic.similar_edges + semantic.semantically_related_edges,
-            vectors_stored: semantic.vectors_stored,
-            duration_ms,
-            artifact_path: artifact_path.map(|p| p.display().to_string()),
-            restored_from_artifact: false,
-        })
     }
 
     fn index_file(&self, file: &DiscoveredFile) -> Result<FileIndexResult> {

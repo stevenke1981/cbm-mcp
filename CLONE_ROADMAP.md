@@ -10,7 +10,7 @@ Target: feature-equivalent Rust rewrite of `D:\_cbm-ref` (DeusData/codebase-memo
 ## P0 — graph correctness
 
 - [ ] Hybrid LSP CALLS (Python, TS/JS, PHP, C#, Go, C/C++)
-- [ ] Store bulk transaction API + rollback tests
+- [x] Store bulk transaction API + rollback tests
 - [ ] Honest `get_graph_schema` vs emitted edges
 
 ## P1 — reference pipeline

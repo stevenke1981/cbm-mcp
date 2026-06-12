@@ -8,11 +8,13 @@ pub use types::*;
 use crate::error::{Error, Result};
 use crate::project::project_db_path;
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub struct Store {
     conn: Connection,
     project: String,
+    bulk_write: Cell<bool>,
 }
 
 impl Store {
@@ -42,6 +44,7 @@ impl Store {
         let store = Self {
             conn,
             project: project.to_string(),
+            bulk_write: Cell::new(false),
         };
         if !readonly {
             store.init_schema()?;
@@ -66,6 +69,7 @@ impl Store {
         let store = Self {
             conn,
             project: "memory".to_string(),
+            bulk_write: Cell::new(false),
         };
         store.init_schema()?;
         Ok(store)
@@ -73,6 +77,40 @@ impl Store {
 
     pub fn project(&self) -> &str {
         &self.project
+    }
+
+    /// Start a bulk index transaction. All writes until commit/rollback share one SQLite transaction.
+    pub fn begin_bulk_write(&self) -> Result<()> {
+        if self.bulk_write.get() {
+            return Err(Error::Other("bulk write already active".into()));
+        }
+        self.conn.execute_batch("PRAGMA synchronous=OFF; BEGIN IMMEDIATE;")?;
+        self.bulk_write.set(true);
+        Ok(())
+    }
+
+    /// Commit a bulk index transaction and restore default pragmas.
+    pub fn commit_bulk_write(&self) -> Result<()> {
+        if !self.bulk_write.get() {
+            return Err(Error::Other("no active bulk write".into()));
+        }
+        self.conn.execute_batch("COMMIT; PRAGMA synchronous=NORMAL;")?;
+        self.bulk_write.set(false);
+        Ok(())
+    }
+
+    /// Roll back a bulk index transaction without persisting partial graph state.
+    pub fn rollback_bulk_write(&self) -> Result<()> {
+        if !self.bulk_write.get() {
+            return Ok(());
+        }
+        let _ = self.conn.execute_batch("ROLLBACK; PRAGMA synchronous=NORMAL;");
+        self.bulk_write.set(false);
+        Ok(())
+    }
+
+    fn in_bulk_write(&self) -> bool {
+        self.bulk_write.get()
     }
 
     fn init_schema(&self) -> Result<()> {
@@ -197,15 +235,35 @@ impl Store {
     }
 
     pub fn upsert_symbols_batch(&self, symbols: &[Symbol]) -> Result<()> {
+        let sql = "INSERT INTO symbols (qualified_name, project, name, label, file_path, line_start, line_end, signature, properties_json)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(qualified_name, project) DO UPDATE SET
+               name=excluded.name, label=excluded.label, file_path=excluded.file_path,
+               line_start=excluded.line_start, line_end=excluded.line_end,
+               signature=excluded.signature, properties_json=excluded.properties_json";
+        if self.in_bulk_write() {
+            for sym in symbols {
+                self.conn.execute(
+                    sql,
+                    params![
+                        sym.qualified_name,
+                        self.project,
+                        sym.name,
+                        sym.label,
+                        sym.file_path,
+                        sym.line_start,
+                        sym.line_end,
+                        sym.signature,
+                        sym.properties_json,
+                    ],
+                )?;
+            }
+            return Ok(());
+        }
         let tx = self.conn.unchecked_transaction()?;
         for sym in symbols {
             tx.execute(
-                "INSERT INTO symbols (qualified_name, project, name, label, file_path, line_start, line_end, signature, properties_json)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-                 ON CONFLICT(qualified_name, project) DO UPDATE SET
-                   name=excluded.name, label=excluded.label, file_path=excluded.file_path,
-                   line_start=excluded.line_start, line_end=excluded.line_end,
-                   signature=excluded.signature, properties_json=excluded.properties_json",
+                sql,
                 params![
                     sym.qualified_name,
                     self.project,
@@ -239,11 +297,27 @@ impl Store {
     }
 
     pub fn insert_edges_batch(&self, edges: &[Edge]) -> Result<()> {
+        let sql = "INSERT OR IGNORE INTO edges (src_qn, dst_qn, edge_type, project, properties_json)
+             VALUES (?1, ?2, ?3, ?4, ?5)";
+        if self.in_bulk_write() {
+            for edge in edges {
+                self.conn.execute(
+                    sql,
+                    params![
+                        edge.src_qn,
+                        edge.dst_qn,
+                        edge.edge_type,
+                        self.project,
+                        edge.properties_json,
+                    ],
+                )?;
+            }
+            return Ok(());
+        }
         let tx = self.conn.unchecked_transaction()?;
         for edge in edges {
             tx.execute(
-                "INSERT OR IGNORE INTO edges (src_qn, dst_qn, edge_type, project, properties_json)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                sql,
                 params![
                     edge.src_qn,
                     edge.dst_qn,

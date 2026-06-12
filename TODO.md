@@ -14,7 +14,7 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** reference module inventory · tool schema drift CI (`tests/mcp_tool_schema_test.rs`) · store bulk transactions · hybrid CALLS/LSP.
+**Next P0 slices:** reference module inventory · hybrid CALLS/LSP · graph buffer staging layer.
 
 Reference sources:
 
@@ -100,12 +100,11 @@ Acceptance criteria:
   - `meta`
   - ADR storage
 - [ ] Add migration/version metadata and compatibility checks.
-- [ ] Implement store bulk transaction API:
-  - begin staging
-  - insert file/symbol/edge batches
-  - rollback on any failed pass
-  - commit only on successful full index
-- [ ] Add rollback tests for partial index failure.
+- [x] Implement store bulk transaction API:
+  - `begin_bulk_write` / `commit_bulk_write` / `rollback_bulk_write`
+  - batch writes skip nested transactions during bulk mode
+  - full index wrapped in single transaction (`pipeline::run_full`)
+- [x] Add rollback tests for partial index failure (`tests/store_bulk_write_test.rs`).
 - [ ] Match `.codebase-memory/graph.db.zst` artifact behavior:
   - export
   - restore
