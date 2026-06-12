@@ -144,6 +144,8 @@ fn is_regex_noise(name: &str) -> bool {
             | "print"
             | "println"
             | "format"
+            | "log"
+            | "console"
     )
 }
 
@@ -228,6 +230,48 @@ mod tests {
             edges.is_empty(),
             "ambiguous cross-file callee should not link"
         );
+    }
+
+    #[test]
+    fn resolves_cross_file_via_python_import_alias() {
+        let symbols = vec![
+            Symbol {
+                qualified_name: qn("main.py", "Function", "main", 3),
+                name: "main".into(),
+                label: "Function".into(),
+                file_path: "main.py".into(),
+                line_start: 3,
+                line_end: 5,
+                signature: None,
+                properties_json: None,
+            },
+            Symbol {
+                qualified_name: qn("utils.py", "Function", "helper", 1),
+                name: "helper".into(),
+                label: "Function".into(),
+                file_path: "utils.py".into(),
+                line_start: 1,
+                line_end: 2,
+                signature: None,
+                properties_json: None,
+            },
+            Symbol {
+                qualified_name: qn("decoy.py", "Function", "helper", 1),
+                name: "helper".into(),
+                label: "Function".into(),
+                file_path: "decoy.py".into(),
+                line_start: 1,
+                line_end: 2,
+                signature: None,
+                properties_json: None,
+            },
+        ];
+        let src = "from utils import helper as h\n\ndef main():\n    h()\n";
+        let registry = build_symbol_registry(&symbols);
+        let edges =
+            resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "main.py");
+        assert_eq!(edges.len(), 1);
+        assert!(edges[0].dst_qn.starts_with("utils.py::"));
     }
 
     #[test]

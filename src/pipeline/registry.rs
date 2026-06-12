@@ -123,7 +123,12 @@ impl SymbolRegistry {
             return None;
         }
 
-        let mut candidates = self.filter_by_kind(self.candidates(callee_name), kind);
+        let lookup_name = imports
+            .symbol_aliases
+            .get(callee_name)
+            .map(String::as_str)
+            .unwrap_or(callee_name);
+        let mut candidates = self.filter_by_kind(self.candidates(lookup_name), kind);
         if let Some(parent) = parent_class {
             let scoped: Vec<String> = candidates
                 .iter()
@@ -476,6 +481,25 @@ mod tests {
         ]);
         let imports = ImportMap::default();
         assert!(reg.resolve("helper", "main.rs", &imports).is_none());
+    }
+
+    #[test]
+    fn resolves_import_alias_to_bound_module_symbol() {
+        let reg = SymbolRegistry::from_symbols(&[
+            sym("main.py", "main", 4),
+            sym("utils.py", "helper", 1),
+            sym("decoy.py", "helper", 1),
+        ]);
+        let mut imports = ImportMap::default();
+        imports
+            .bindings
+            .insert("h".into(), "utils.py".into());
+        imports
+            .symbol_aliases
+            .insert("h".into(), "helper".into());
+        let res = reg.resolve("h", "main.py", &imports).unwrap();
+        assert_eq!(res.strategy, "import_binding");
+        assert!(res.qn.starts_with("utils.py::"));
     }
 
     #[test]

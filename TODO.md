@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** (pick from P0 backlog — negative CALLS fixtures, MCP JSON-RPC parity, or incremental index).
+**Next P0 slices:** MCP JSON-RPC parity · incremental index · artifact export/restore.
 
-**Done recently:** PHP require/autoload hardening (`require`/`include` + composer PSR-4) · CALLS confidence metadata · C# CALLS AST · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
+**Done recently:** CALLS negative fixtures (alias/ambiguous/overload-like/framework noise) · PHP require/autoload · CALLS confidence metadata · C# CALLS AST · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -178,12 +178,12 @@ Acceptance criteria:
 - [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).
 - [x] Add method vs free-function disambiguation (`CallTargetKind` + Method label in extract).
 - [x] Add class/impl/trait/interface method resolution (`parent_class` + scoped `resolve_kind_scoped`).
-- [ ] Add negative fixtures:
-  - same symbol name in multiple files
-  - nested functions
-  - overloaded-like methods
-  - imported aliases
-  - framework callback names
+- [x] Add negative fixtures (`tests/calls_negative_fixtures_test.rs` + existing ambiguous/nested tests):
+  - [x] same symbol name in multiple files
+  - [x] nested functions
+  - [x] overloaded-like methods (class-scoped)
+  - [x] imported aliases (Python/JS `as` + `symbol_aliases`)
+  - [x] framework callback names (`console.log` noise)
 - [x] Record confidence metadata in `properties_json` (`call_edge_properties_json`: callee, confidence, strategy, candidates, method, band).
 
 Acceptance criteria:

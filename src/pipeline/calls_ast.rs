@@ -178,7 +178,10 @@ fn is_noise_callee(language: &str, name: &str) -> bool {
         ),
         "python" => matches!(name, "if" | "for" | "while" | "return" | "print" | "len"),
         "javascript" | "jsx" | "typescript" | "tsx" => {
-            matches!(name, "if" | "for" | "while" | "return" | "console" | "require")
+            matches!(
+                name,
+                "if" | "for" | "while" | "return" | "console" | "require" | "log"
+            )
         }
         "csharp" => matches!(name, "if" | "for" | "while" | "return" | "new" | "typeof" | "nameof"),
         _ => false,
@@ -192,6 +195,48 @@ mod tests {
     use crate::pipeline::extract::extract_symbols;
     use crate::pipeline::registry::FileCallResolver;
     use crate::pipeline::import_map::ImportMap;
+
+    #[test]
+    fn python_import_alias_call_resolves() {
+        use crate::pipeline::calls::build_symbol_registry;
+        use crate::pipeline::import_map::ImportMap;
+        use crate::symbol_id::qualified_name;
+
+        let src = "from utils import helper as h\n\ndef main():\n    h()\n";
+        let symbols = vec![
+            Symbol {
+                qualified_name: qualified_name("main.py", "Function", "main", 3),
+                name: "main".into(),
+                label: "Function".into(),
+                file_path: "main.py".into(),
+                line_start: 3,
+                line_end: 5,
+                signature: None,
+                properties_json: None,
+            },
+            Symbol {
+                qualified_name: qualified_name("utils.py", "Function", "helper", 1),
+                name: "helper".into(),
+                label: "Function".into(),
+                file_path: "utils.py".into(),
+                line_start: 1,
+                line_end: 2,
+                signature: None,
+                properties_json: None,
+            },
+        ];
+        let registry = build_symbol_registry(&symbols);
+        let imports = ImportMap::parse("main.py", "python", src);
+        assert!(imports.bindings.contains_key("h"));
+        let mut resolver =
+            FileCallResolver::new(&registry, "main.py", imports);
+        let edges = resolve_calls_ast("python", &symbols[..1], src, &mut resolver);
+        assert!(
+            !edges.is_empty(),
+            "expected python alias AST edge; resolver={:?}",
+            resolver.resolve("h")
+        );
+    }
 
     #[test]
     fn csharp_local_method_call_resolves() {

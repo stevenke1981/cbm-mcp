@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub struct ImportMap {
     /// Imported bare name (e.g. `helper`) → target module path (`utils.py`).
     pub bindings: HashMap<String, String>,
+    /// Local import alias → original symbol name (`h` → `helper` for `import helper as h`).
+    pub symbol_aliases: HashMap<String, String>,
     /// Module paths imported wholesale (e.g. `utils` from `import utils`).
     pub modules: Vec<String>,
 }
@@ -70,31 +72,51 @@ impl ImportMap {
 
 fn parse_python_imports(file_path: &str, caller_dir: &str, content: &str, map: &mut ImportMap) {
     let from_import =
-        Regex::new(r"(?m)^\s*from\s+([\w.]+)\s+import\s+([\w.,\s]+)").unwrap();
-    let plain_import = Regex::new(r"(?m)^\s*import\s+([\w.]+)").unwrap();
-
+        Regex::new(r"(?m)^\s*from\s+([\w.]+)\s+import\s+([^\n;#]+)").unwrap();
     for cap in from_import.captures_iter(content) {
         let module = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let names = cap.get(2).map(|m| m.as_str()).unwrap_or("");
         let target = resolve_python_module(file_path, caller_dir, module);
-        for name in names.split(',') {
-            let name = name.trim().split_whitespace().next().unwrap_or("").trim();
-            if !name.is_empty() && name != "*" {
-                map.bindings.insert(name.to_string(), target.clone());
+        for item in names.split(',') {
+            let (local, imported) = parse_import_item(item.trim());
+            if imported.is_empty() || imported == "*" {
+                continue;
+            }
+            map.bindings.insert(local.to_string(), target.clone());
+            if local != imported {
+                map.symbol_aliases.insert(local.to_string(), imported.to_string());
             }
         }
         map.modules.push(target);
     }
 
+    let plain_import =
+        Regex::new(r"(?m)^\s*import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$").unwrap();
     for cap in plain_import.captures_iter(content) {
         let module = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let alias = cap.get(2).map(|m| m.as_str());
         let target = resolve_python_module(file_path, caller_dir, module);
         let base = module.split('.').next_back().unwrap_or(module);
-        map.bindings
-            .entry(base.to_string())
-            .or_insert_with(|| target.clone());
+        let local = alias.unwrap_or(base);
+        map.bindings.insert(local.to_string(), target.clone());
+        if alias.is_some() {
+            map.symbol_aliases
+                .insert(local.to_string(), base.to_string());
+        }
         map.modules.push(target);
     }
+}
+
+fn parse_import_item(item: &str) -> (&str, &str) {
+    if let Some((imported, local)) = item.split_once(" as ") {
+        let imported = imported.trim();
+        let local = local.trim();
+        if !imported.is_empty() && !local.is_empty() {
+            return (local, imported);
+        }
+    }
+    let imported = item.split_whitespace().next().unwrap_or("").trim();
+    (imported, imported)
 }
 
 fn resolve_python_module(file_path: &str, caller_dir: &str, module: &str) -> String {
@@ -154,10 +176,14 @@ fn parse_js_imports(file_path: &str, caller_dir: &str, content: &str, map: &mut 
         let names = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let from = cap.get(2).map(|m| m.as_str()).unwrap_or("");
         let target = resolve_js_module(file_path, caller_dir, from);
-        for name in names.split(',') {
-            let name = name.trim();
-            if !name.is_empty() {
-                map.bindings.insert(name.to_string(), target.clone());
+        for item in names.split(',') {
+            let (local, imported) = parse_import_item(item.trim());
+            if imported.is_empty() {
+                continue;
+            }
+            map.bindings.insert(local.to_string(), target.clone());
+            if local != imported {
+                map.symbol_aliases.insert(local.to_string(), imported.to_string());
             }
         }
         map.modules.push(target);
@@ -494,6 +520,26 @@ mod tests {
             map.bindings.get("helper").map(String::as_str),
             Some("utils.py")
         );
+    }
+
+    #[test]
+    fn python_from_import_alias_binds_local_name() {
+        let src = "from utils import helper as h\n\ndef main():\n    pass\n";
+        let map = ImportMap::parse("main.py", "python", src);
+        assert_eq!(map.bindings.get("h").map(String::as_str), Some("utils.py"));
+        assert_eq!(map.symbol_aliases.get("h").map(String::as_str), Some("helper"));
+        assert_eq!(map.symbol_aliases.get("h").map(String::as_str), Some("helper"));
+    }
+
+    #[test]
+    fn js_named_import_alias_binds_local_name() {
+        let src = "import { helper as h } from './utils'\n";
+        let map = ImportMap::parse("src/main.js", "javascript", src);
+        assert_eq!(
+            map.bindings.get("h").map(String::as_str),
+            Some("src/utils.js")
+        );
+        assert_eq!(map.symbol_aliases.get("h").map(String::as_str), Some("helper"));
     }
 
     #[test]
