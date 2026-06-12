@@ -2,7 +2,7 @@
   "schema_version": "0.1",
   "name": "cbm",
   "display_name": "cbm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "transport": "stdio",
   "command": "cbm",
   "args": [],

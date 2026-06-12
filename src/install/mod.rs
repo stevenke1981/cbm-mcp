@@ -211,6 +211,13 @@ fn resolve_source_binary(override_path: Option<&Path>) -> Result<PathBuf> {
 }
 
 fn install_binary(source: &Path, dest: &Path) -> Result<()> {
+    if source == dest
+        || (source.exists()
+            && dest.exists()
+            && fs::canonicalize(source).ok() == fs::canonicalize(dest).ok())
+    {
+        return Ok(());
+    }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -1131,5 +1138,17 @@ mod tests {
         let dir = default_install_dir();
         assert!(dir.to_string_lossy().contains("cbm-mcp"));
         assert!(dir.ends_with("bin"));
+    }
+
+    #[test]
+    fn installing_binary_over_itself_is_a_noop() {
+        let dir = TempDir::new().unwrap();
+        let bin = dir.path().join("cbm.exe");
+        fs::write(&bin, b"release-binary").unwrap();
+
+        install_binary(&bin, &bin).unwrap();
+
+        assert_eq!(fs::read(&bin).unwrap(), b"release-binary");
+        assert!(!bin.with_extension("old").exists());
     }
 }

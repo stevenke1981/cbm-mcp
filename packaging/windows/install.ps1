@@ -2,7 +2,7 @@
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/windows/install.ps1 | iex
-#   $env:CBM_VERSION = "v0.2.0"; .\packaging\windows\install.ps1
+#   $env:CBM_VERSION = "v0.2.1"; .\packaging\windows\install.ps1
 
 param(
     [string]$Version = $(if ($env:CBM_VERSION) { $env:CBM_VERSION } elseif ($env:CBRLM_VERSION) { $env:CBRLM_VERSION } else { "latest" }),
@@ -32,7 +32,12 @@ Invoke-WebRequest -Uri $Url -OutFile $ArchivePath
 
 Write-Host "Verifying checksum ..."
 $sums = Invoke-WebRequest -Uri $ChecksumsUrl -UseBasicParsing
-$expected = ($sums.Content -split "`n" | Where-Object { $_ -match "\s+$([regex]::Escape($Archive))`$" } | ForEach-Object { ($_ -split '\s+')[0] } | Select-Object -First 1)
+$checksumText = if ($sums.Content -is [byte[]]) {
+    [Text.Encoding]::UTF8.GetString($sums.Content)
+} else {
+    [string]$sums.Content
+}
+$expected = ($checksumText -split "`r?`n" | Where-Object { $_ -match "\s+$([regex]::Escape($Archive))`$" } | ForEach-Object { ($_ -split '\s+')[0] } | Select-Object -First 1)
 if (-not $expected) {
     throw "checksum for $Archive not found in SHA256SUMS.txt"
 }
@@ -44,7 +49,7 @@ if ($actual -ne $expected.ToLower()) {
 Expand-Archive -Path $ArchivePath -DestinationPath $Tmp -Force
 $Extracted = Get-ChildItem -Path $Tmp -Filter "cbm.exe" -Recurse | Select-Object -First 1
 if (-not $Extracted) { throw "cbm.exe not found in archive" }
-Copy-Item $Extracted.FullName (Join-Path $InstallDir "cbm.exe") -Force
+$bin = Join-Path $InstallDir "cbm.exe"
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$InstallDir*") {
@@ -53,8 +58,9 @@ if ($userPath -notlike "*$InstallDir*") {
     Write-Host "Added $InstallDir to user PATH"
 }
 
-$bin = Join-Path $InstallDir "cbm.exe"
-& $bin install --yes --all
+& $Extracted.FullName install --yes --all
+if ($LASTEXITCODE -ne 0) { throw "cbm OpenCode configuration failed" }
+if (-not (Test-Path -LiteralPath $bin)) { throw "cbm.exe was not installed to $bin" }
 
 Write-Host ""
 Write-Host "Installed cbm $Version -> $bin" -ForegroundColor Green
