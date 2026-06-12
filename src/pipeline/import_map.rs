@@ -71,8 +71,7 @@ impl ImportMap {
 }
 
 fn parse_python_imports(file_path: &str, caller_dir: &str, content: &str, map: &mut ImportMap) {
-    let from_import =
-        Regex::new(r"(?m)^\s*from\s+([\w.]+)\s+import\s+([^\n;#]+)").unwrap();
+    let from_import = Regex::new(r"(?m)^\s*from\s+([\w.]+)\s+import\s+([^\n;#]+)").unwrap();
     for cap in from_import.captures_iter(content) {
         let module = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let names = cap.get(2).map(|m| m.as_str()).unwrap_or("");
@@ -84,14 +83,14 @@ fn parse_python_imports(file_path: &str, caller_dir: &str, content: &str, map: &
             }
             map.bindings.insert(local.to_string(), target.clone());
             if local != imported {
-                map.symbol_aliases.insert(local.to_string(), imported.to_string());
+                map.symbol_aliases
+                    .insert(local.to_string(), imported.to_string());
             }
         }
         map.modules.push(target);
     }
 
-    let plain_import =
-        Regex::new(r"(?m)^\s*import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$").unwrap();
+    let plain_import = Regex::new(r"(?m)^\s*import\s+([\w.]+)(?:\s+as\s+(\w+))?\s*$").unwrap();
     for cap in plain_import.captures_iter(content) {
         let module = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let alias = cap.get(2).map(|m| m.as_str());
@@ -121,11 +120,11 @@ fn parse_import_item(item: &str) -> (&str, &str) {
 
 fn resolve_python_module(file_path: &str, caller_dir: &str, module: &str) -> String {
     let dotted = module.replace('.', "/");
-    let candidates = [
-        format!("{dotted}.py"),
-        format!("{dotted}/__init__.py"),
-    ];
-    if let Some(hit) = candidates.iter().find(|c| !c.starts_with('/') && !c.contains("..")) {
+    let candidates = [format!("{dotted}.py"), format!("{dotted}/__init__.py")];
+    if let Some(hit) = candidates
+        .iter()
+        .find(|c| !c.starts_with('/') && !c.contains(".."))
+    {
         return hit.clone();
     }
     let _ = (file_path, caller_dir);
@@ -163,14 +162,10 @@ fn path_to_rs_module(path: &str) -> String {
 }
 
 fn parse_js_imports(file_path: &str, caller_dir: &str, content: &str, map: &mut ImportMap) {
-    let named = Regex::new(
-        r#"(?m)^\s*import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]"#,
-    )
-    .unwrap();
-    let default_import =
-        Regex::new(r#"(?m)^\s*import\s+(\w+)\s+from\s+['"]([^'"]+)['"]"#).unwrap();
-    let require_re = Regex::new(r#"(?m)(?:const|let|var)\s+(\w+)\s*=\s*require\(['"]([^'"]+)['"]\)"#)
-        .unwrap();
+    let named = Regex::new(r#"(?m)^\s*import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]"#).unwrap();
+    let default_import = Regex::new(r#"(?m)^\s*import\s+(\w+)\s+from\s+['"]([^'"]+)['"]"#).unwrap();
+    let require_re =
+        Regex::new(r#"(?m)(?:const|let|var)\s+(\w+)\s*=\s*require\(['"]([^'"]+)['"]\)"#).unwrap();
 
     for cap in named.captures_iter(content) {
         let names = cap.get(1).map(|m| m.as_str()).unwrap_or("");
@@ -183,7 +178,8 @@ fn parse_js_imports(file_path: &str, caller_dir: &str, content: &str, map: &mut 
             }
             map.bindings.insert(local.to_string(), target.clone());
             if local != imported {
-                map.symbol_aliases.insert(local.to_string(), imported.to_string());
+                map.symbol_aliases
+                    .insert(local.to_string(), imported.to_string());
             }
         }
         map.modules.push(target);
@@ -234,8 +230,7 @@ fn resolve_js_module(file_path: &str, caller_dir: &str, from: &str) -> String {
 }
 
 fn parse_java_imports(content: &str, map: &mut ImportMap) {
-    let import_re =
-        Regex::new(r"(?m)^\s*import\s+(?:static\s+)?([\w.]+)\s*;").unwrap();
+    let import_re = Regex::new(r"(?m)^\s*import\s+(?:static\s+)?([\w.]+)\s*;").unwrap();
     for cap in import_re.captures_iter(content) {
         let path = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         if path.is_empty() {
@@ -276,10 +271,8 @@ fn parse_php_imports(
 ) {
     let psr4 = load_composer_psr4(file_path, repo_root);
 
-    let use_re = Regex::new(
-        r"(?m)^\s*use\s+(?:function|const\s+)?([\w\\]+)(?:\s+as\s+(\w+))?\s*;",
-    )
-    .unwrap();
+    let use_re =
+        Regex::new(r"(?m)^\s*use\s+(?:function|const\s+)?([\w\\]+)(?:\s+as\s+(\w+))?\s*;").unwrap();
     for cap in use_re.captures_iter(content) {
         let path = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         if path.is_empty() || !path.contains('\\') {
@@ -288,8 +281,7 @@ fn parse_php_imports(
         bind_php_use(path, cap.get(2).map(|m| m.as_str()), &psr4, map);
     }
 
-    let grouped_use_re =
-        Regex::new(r"(?m)^\s*use\s+([\w\\]+)\s*\\\s*\{([^}]+)\}\s*;").unwrap();
+    let grouped_use_re = Regex::new(r"(?m)^\s*use\s+([\w\\]+)\s*\\\s*\{([^}]+)\}\s*;").unwrap();
     for cap in grouped_use_re.captures_iter(content) {
         let prefix = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let items = cap.get(2).map(|m| m.as_str()).unwrap_or("");
@@ -306,10 +298,8 @@ fn parse_php_imports(
         }
     }
 
-    let require_re = Regex::new(
-        r#"(?i)(?:require|include)(?:_once)?\s*(?:\(\s*)?['"]([^'"]+)['"]"#,
-    )
-    .unwrap();
+    let require_re =
+        Regex::new(r#"(?i)(?:require|include)(?:_once)?\s*(?:\(\s*)?['"]([^'"]+)['"]"#).unwrap();
     for cap in require_re.captures_iter(content) {
         let target = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         if target.is_empty() {
@@ -317,10 +307,7 @@ fn parse_php_imports(
         }
         let resolved = resolve_php_path(file_path, caller_dir, target);
         map.modules.push(resolved.clone());
-        if let Some(stem) = Path::new(&resolved)
-            .file_stem()
-            .and_then(|s| s.to_str())
-        {
+        if let Some(stem) = Path::new(&resolved).file_stem().and_then(|s| s.to_str()) {
             map.bindings
                 .entry(stem.to_string())
                 .or_insert_with(|| resolved);
@@ -328,7 +315,12 @@ fn parse_php_imports(
     }
 }
 
-fn bind_php_use(use_path: &str, alias: Option<&str>, psr4: &[(String, String)], map: &mut ImportMap) {
+fn bind_php_use(
+    use_path: &str,
+    alias: Option<&str>,
+    psr4: &[(String, String)],
+    map: &mut ImportMap,
+) {
     let class_name = alias.unwrap_or_else(|| use_path.rsplit('\\').next().unwrap_or(use_path));
     let target = php_use_to_file(use_path, psr4);
     map.bindings.insert(class_name.to_string(), target.clone());
@@ -344,9 +336,7 @@ fn php_use_to_file(use_path: &str, psr4: &[(String, String)]) -> String {
         return format!("{use_path}.php");
     }
     let class_name = parts.last().copied().unwrap_or(use_path);
-    let pkg = parts[..parts.len() - 1]
-        .join("/")
-        .to_ascii_lowercase();
+    let pkg = parts[..parts.len() - 1].join("/").to_ascii_lowercase();
     format!("{pkg}/{class_name}.php")
 }
 
@@ -391,9 +381,7 @@ fn resolve_php_path(file_path: &str, caller_dir: &str, target: &str) -> String {
     } else {
         PathBuf::from(caller_dir)
     };
-    let rel = normalized
-        .strip_prefix("./")
-        .unwrap_or(normalized.as_str());
+    let rel = normalized.strip_prefix("./").unwrap_or(normalized.as_str());
     let joined = base.join(rel);
     let mut path = normalize_path(&joined.to_string_lossy());
     while path.contains("/./") {
@@ -407,11 +395,7 @@ fn resolve_php_path(file_path: &str, caller_dir: &str, target: &str) -> String {
 
 fn load_composer_psr4(file_path: &str, repo_root: Option<&Path>) -> Vec<(String, String)> {
     let base = repo_root.unwrap_or(Path::new("."));
-    let mut dir = base.join(
-        Path::new(file_path)
-            .parent()
-            .unwrap_or(Path::new(".")),
-    );
+    let mut dir = base.join(Path::new(file_path).parent().unwrap_or(Path::new(".")));
     for _ in 0..8 {
         let composer = dir.join("composer.json");
         if composer.is_file() {
@@ -481,9 +465,7 @@ fn parse_go_imports(content: &str, map: &mut ImportMap) {
 }
 
 fn normalize_path(path: &str) -> String {
-    path.replace('\\', "/")
-        .trim_start_matches("./")
-        .to_string()
+    path.replace('\\', "/").trim_start_matches("./").to_string()
 }
 
 fn path_matches_module(candidate_file: &str, module_path: &str) -> bool {
@@ -504,8 +486,7 @@ fn path_matches_module(candidate_file: &str, module_path: &str) -> bool {
             .is_some_and(|stem| m.starts_with(stem))
         || c.strip_suffix(".php")
             .is_some_and(|stem| m.starts_with(stem))
-        || m.strip_suffix('/')
-            .is_some_and(|pkg| c.starts_with(pkg))
+        || m.strip_suffix('/').is_some_and(|pkg| c.starts_with(pkg))
 }
 
 #[cfg(test)]
@@ -527,8 +508,14 @@ mod tests {
         let src = "from utils import helper as h\n\ndef main():\n    pass\n";
         let map = ImportMap::parse("main.py", "python", src);
         assert_eq!(map.bindings.get("h").map(String::as_str), Some("utils.py"));
-        assert_eq!(map.symbol_aliases.get("h").map(String::as_str), Some("helper"));
-        assert_eq!(map.symbol_aliases.get("h").map(String::as_str), Some("helper"));
+        assert_eq!(
+            map.symbol_aliases.get("h").map(String::as_str),
+            Some("helper")
+        );
+        assert_eq!(
+            map.symbol_aliases.get("h").map(String::as_str),
+            Some("helper")
+        );
     }
 
     #[test]
@@ -539,7 +526,10 @@ mod tests {
             map.bindings.get("h").map(String::as_str),
             Some("src/utils.js")
         );
-        assert_eq!(map.symbol_aliases.get("h").map(String::as_str), Some("helper"));
+        assert_eq!(
+            map.symbol_aliases.get("h").map(String::as_str),
+            Some("helper")
+        );
     }
 
     #[test]

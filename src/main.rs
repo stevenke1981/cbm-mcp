@@ -116,11 +116,9 @@ fn main() {
         }
         Some(Command::Config { action }) => cli::run_config(&action),
         Some(Command::Ui { port }) => cli::run_ui_server(port),
-        None => {
-            cli::run_mcp_server(codebase_memory_mcp::http::UiConfig::from_env_and_args(
-                args.ui, args.port,
-            ))
-        }
+        None => cli::run_mcp_server(codebase_memory_mcp::http::UiConfig::from_env_and_args(
+            args.ui, args.port,
+        )),
     };
 
     if let Err(e) = result {

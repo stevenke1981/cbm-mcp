@@ -112,7 +112,8 @@ fn language_to_tree_sitter(language: &str) -> Option<Language> {
 
 fn call_query_for(language: &str) -> Option<&'static str> {
     Some(match language {
-        "rust" => r#"
+        "rust" => {
+            r#"
 (call_expression
   function: (identifier) @callee)
 (call_expression
@@ -121,50 +122,63 @@ fn call_query_for(language: &str) -> Option<&'static str> {
 (call_expression
   function: (scoped_identifier
     name: (identifier) @scoped))
-"#,
-        "python" => r#"
+"#
+        }
+        "python" => {
+            r#"
 (call
   function: (identifier) @callee)
 (call
   function: (attribute
     attribute: (identifier) @method))
-"#,
-        "javascript" | "jsx" | "typescript" | "tsx" => r#"
+"#
+        }
+        "javascript" | "jsx" | "typescript" | "tsx" => {
+            r#"
 (call_expression
   function: (identifier) @callee)
 (call_expression
   function: (member_expression
     property: (property_identifier) @method))
-"#,
-        "go" => r#"
+"#
+        }
+        "go" => {
+            r#"
 (call_expression
   function: (identifier) @callee)
 (call_expression
   function: (selector_expression
     field: (field_identifier) @method))
-"#,
-        "java" => r#"
+"#
+        }
+        "java" => {
+            r#"
 (method_invocation
   name: (identifier) @callee)
 (method_invocation
   object: (_)
   name: (identifier) @method)
-"#,
-        "c" | "cpp" => r#"
+"#
+        }
+        "c" | "cpp" => {
+            r#"
 (call_expression
   function: (identifier) @callee)
 (call_expression
   function: (field_expression
     argument: (_)
     field: (field_identifier) @method))
-"#,
-        "csharp" => r#"
+"#
+        }
+        "csharp" => {
+            r#"
 (invocation_expression
   function: (identifier) @callee)
 (invocation_expression
   function: (member_access_expression
     name: (identifier) @method))
-"#,
+"#
+        }
         _ => return None,
     })
 }
@@ -173,7 +187,14 @@ fn is_noise_callee(language: &str, name: &str) -> bool {
     match language {
         "rust" => matches!(
             name,
-            "if" | "for" | "while" | "match" | "return" | "let" | "loop" | "move" | "async"
+            "if" | "for"
+                | "while"
+                | "match"
+                | "return"
+                | "let"
+                | "loop"
+                | "move"
+                | "async"
                 | "await"
         ),
         "python" => matches!(name, "if" | "for" | "while" | "return" | "print" | "len"),
@@ -183,7 +204,10 @@ fn is_noise_callee(language: &str, name: &str) -> bool {
                 "if" | "for" | "while" | "return" | "console" | "require" | "log"
             )
         }
-        "csharp" => matches!(name, "if" | "for" | "while" | "return" | "new" | "typeof" | "nameof"),
+        "csharp" => matches!(
+            name,
+            "if" | "for" | "while" | "return" | "new" | "typeof" | "nameof"
+        ),
         _ => false,
     }
 }
@@ -193,8 +217,8 @@ mod tests {
     use super::*;
     use crate::pipeline::calls::build_symbol_registry;
     use crate::pipeline::extract::extract_symbols;
-    use crate::pipeline::registry::FileCallResolver;
     use crate::pipeline::import_map::ImportMap;
+    use crate::pipeline::registry::FileCallResolver;
 
     #[test]
     fn python_import_alias_call_resolves() {
@@ -228,8 +252,7 @@ mod tests {
         let registry = build_symbol_registry(&symbols);
         let imports = ImportMap::parse("main.py", "python", src);
         assert!(imports.bindings.contains_key("h"));
-        let mut resolver =
-            FileCallResolver::new(&registry, "main.py", imports);
+        let mut resolver = FileCallResolver::new(&registry, "main.py", imports);
         let edges = resolve_calls_ast("python", &symbols[..1], src, &mut resolver);
         assert!(
             !edges.is_empty(),
@@ -251,10 +274,7 @@ mod tests {
         let imports = ImportMap::parse("App.cs", "csharp", src);
         let mut resolver = FileCallResolver::new(&registry, "App.cs", imports);
         let edges = resolve_calls_ast("csharp", &symbols, src, &mut resolver);
-        assert!(
-            !edges.is_empty(),
-            "expected AST edges; symbols={symbols:?}"
-        );
+        assert!(!edges.is_empty(), "expected AST edges; symbols={symbols:?}");
     }
 }
 

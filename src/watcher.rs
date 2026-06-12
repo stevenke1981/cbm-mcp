@@ -281,11 +281,7 @@ fn should_reindex(state: &WatchState, git: &GitStatus, signature: &str) -> bool 
 }
 
 fn collect_changed_files(state: &WatchState, git: &GitStatus) -> Vec<String> {
-    git::collect_incremental_paths(
-        &state.repo_path,
-        state.last_head.as_deref(),
-        git,
-    )
+    git::collect_incremental_paths(&state.repo_path, state.last_head.as_deref(), git)
 }
 
 impl Default for Watcher {

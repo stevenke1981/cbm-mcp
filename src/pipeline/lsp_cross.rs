@@ -41,8 +41,12 @@ pub fn resolve_cross_file_calls_root(
 
         match file.language.as_str() {
             "python" => {
-                let imports =
-                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
+                let imports = ImportMap::parse_with_root(
+                    &file.path,
+                    &file.language,
+                    &file.content,
+                    repo_root,
+                );
                 let bindings = infer_python_type_bindings(&file.content, &imports);
                 edges.extend(resolve_attribute_calls(
                     AttributeCallConfig {
@@ -59,8 +63,12 @@ pub fn resolve_cross_file_calls_root(
                 ));
             }
             lang if JS_LANGS.contains(&lang) => {
-                let imports =
-                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
+                let imports = ImportMap::parse_with_root(
+                    &file.path,
+                    &file.language,
+                    &file.content,
+                    repo_root,
+                );
                 let bindings = infer_js_type_bindings(&file.content, &imports);
                 let ts_lang = if matches!(lang, "typescript" | "tsx") {
                     tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
@@ -82,8 +90,12 @@ pub fn resolve_cross_file_calls_root(
                 ));
             }
             "go" => {
-                let imports =
-                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
+                let imports = ImportMap::parse_with_root(
+                    &file.path,
+                    &file.language,
+                    &file.content,
+                    repo_root,
+                );
                 let bindings =
                     infer_go_type_bindings(&file.content, &imports, &class_index, &methods_by_file);
                 edges.extend(resolve_attribute_calls(
@@ -101,8 +113,12 @@ pub fn resolve_cross_file_calls_root(
                 ));
             }
             "java" => {
-                let imports =
-                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
+                let imports = ImportMap::parse_with_root(
+                    &file.path,
+                    &file.language,
+                    &file.content,
+                    repo_root,
+                );
                 let bindings = infer_java_type_bindings(&file.content, &imports);
                 edges.extend(resolve_attribute_calls(
                     AttributeCallConfig {
@@ -119,8 +135,12 @@ pub fn resolve_cross_file_calls_root(
                 ));
             }
             "php" => {
-                let imports =
-                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
+                let imports = ImportMap::parse_with_root(
+                    &file.path,
+                    &file.language,
+                    &file.content,
+                    repo_root,
+                );
                 let bindings = infer_php_type_bindings(&file.content, &imports);
                 edges.extend(resolve_attribute_calls(
                     AttributeCallConfig {
@@ -186,13 +206,10 @@ fn build_class_index(symbols: &[Symbol]) -> HashMap<String, Vec<ClassEntry>> {
         if sym.label != "Class" {
             continue;
         }
-        index
-            .entry(sym.name.clone())
-            .or_default()
-            .push(ClassEntry {
-                file: sym.file_path.clone(),
-                line: sym.line_start,
-            });
+        index.entry(sym.name.clone()).or_default().push(ClassEntry {
+            file: sym.file_path.clone(),
+            line: sym.line_start,
+        });
     }
     index
 }
@@ -243,8 +260,7 @@ struct MethodEntry {
 
 fn infer_python_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
     let mut bindings = import_name_bindings(imports);
-    let assign_re =
-        regex::Regex::new(r"(?m)^\s*(\w+)\s*=\s*(\w+)\s*\(").expect("assign regex");
+    let assign_re = regex::Regex::new(r"(?m)^\s*(\w+)\s*=\s*(\w+)\s*\(").expect("assign regex");
     for cap in assign_re.captures_iter(content) {
         let var = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
@@ -266,13 +282,15 @@ fn infer_js_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String,
             bindings.insert(var.to_string(), class_name.to_string());
         }
     }
-    let ctor_re =
-        regex::Regex::new(r"(?m)(?:const|let|var)\s+(\w+)\s*=\s*(\w+)\s*\(").expect("js ctor regex");
+    let ctor_re = regex::Regex::new(r"(?m)(?:const|let|var)\s+(\w+)\s*=\s*(\w+)\s*\(")
+        .expect("js ctor regex");
     for cap in ctor_re.captures_iter(content) {
         let var = cap.get(1).map(|m| m.as_str()).unwrap_or("");
         let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
         if !var.is_empty() && !class_name.is_empty() {
-            bindings.entry(var.to_string()).or_insert(class_name.to_string());
+            bindings
+                .entry(var.to_string())
+                .or_insert(class_name.to_string());
         }
     }
     bindings
@@ -294,10 +312,8 @@ fn infer_php_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String
 
 fn infer_java_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
     let mut bindings = import_name_bindings(imports);
-    let assign_re = regex::Regex::new(
-        r"(?m)(\w+)\s+(\w+)\s*=\s*new\s+(\w+)\s*\(",
-    )
-    .expect("java assign regex");
+    let assign_re =
+        regex::Regex::new(r"(?m)(\w+)\s+(\w+)\s*=\s*new\s+(\w+)\s*\(").expect("java assign regex");
     for cap in assign_re.captures_iter(content) {
         let var = cap.get(2).map(|m| m.as_str()).unwrap_or("");
         let class_name = cap.get(3).map(|m| m.as_str()).unwrap_or("");
@@ -401,7 +417,10 @@ fn resolve_attribute_calls(
                     call_line = (cap.node.start_position().row + 1) as i64;
                 }
             }
-            if method_name.is_empty() || call_line < caller.line_start || call_line > caller.line_end {
+            if method_name.is_empty()
+                || call_line < caller.line_start
+                || call_line > caller.line_end
+            {
                 continue;
             }
             let Some(recv) = recv_node else {
@@ -500,17 +519,14 @@ fn php_object_class(recv: tree_sitter::Node, content: &str) -> Option<String> {
 
 fn php_type_name(node: tree_sitter::Node, content: &str) -> Option<String> {
     let text = node.utf8_text(content.as_bytes()).ok()?;
-    Some(
-        text.rsplit('\\')
-            .next()
-            .unwrap_or(text)
-            .to_string(),
-    )
+    Some(text.rsplit('\\').next().unwrap_or(text).to_string())
 }
 
 fn java_type_name(node: tree_sitter::Node, content: &str) -> Option<String> {
     match node.kind() {
-        "type_identifier" | "identifier" => node.utf8_text(content.as_bytes()).ok().map(str::to_string),
+        "type_identifier" | "identifier" => {
+            node.utf8_text(content.as_bytes()).ok().map(str::to_string)
+        }
         "scoped_type_identifier" => {
             let text = node.utf8_text(content.as_bytes()).ok()?;
             text.rsplit('.').next().map(str::to_string)
@@ -527,10 +543,7 @@ fn infer_call_constructor(recv: tree_sitter::Node, content: &str) -> Option<Stri
             let field = func.child_by_field_name("field")?;
             let op = func.child_by_field_name("operand")?;
             if field.utf8_text(content.as_bytes()).ok()? != "New"
-                && !field
-                    .utf8_text(content.as_bytes())
-                    .ok()?
-                    .starts_with("New")
+                && !field.utf8_text(content.as_bytes()).ok()?.starts_with("New")
             {
                 return None;
             }
@@ -573,9 +586,7 @@ fn resolve_class_method(
         .filter(|m| {
             m.name == method_name
                 && m.line > class_entry.line
-                && m.parent_class
-                    .as_ref()
-                    .is_none_or(|p| p == class_name)
+                && m.parent_class.as_ref().is_none_or(|p| p == class_name)
         })
         .collect();
     if class_methods.len() != 1 {
@@ -671,8 +682,7 @@ mod tests {
         let files = vec![SourceFile {
             path: "main.py".into(),
             language: "python".into(),
-            content: "from greeter import Greeter\n\ndef main():\n    Greeter().greet()\n"
-                .into(),
+            content: "from greeter import Greeter\n\ndef main():\n    Greeter().greet()\n".into(),
             line_count: 4,
             mtime_ns: None,
             size_bytes: None,

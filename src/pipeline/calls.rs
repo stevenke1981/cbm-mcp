@@ -41,10 +41,20 @@ pub fn resolve_calls_with_registry_root(
 
     if matches!(
         language,
-        "rust" | "python" | "javascript" | "jsx" | "typescript" | "tsx" | "go" | "java" | "c"
-            | "cpp" | "csharp"
+        "rust"
+            | "python"
+            | "javascript"
+            | "jsx"
+            | "typescript"
+            | "tsx"
+            | "go"
+            | "java"
+            | "c"
+            | "cpp"
+            | "csharp"
     ) {
-        let ast_edges = super::calls_ast::resolve_calls_ast(language, symbols, content, &mut resolver);
+        let ast_edges =
+            super::calls_ast::resolve_calls_ast(language, symbols, content, &mut resolver);
         if !ast_edges.is_empty() {
             return ast_edges;
         }
@@ -69,8 +79,14 @@ fn resolve_calls_regex(
     resolver: &mut FileCallResolver<'_>,
 ) -> Vec<Edge> {
     let call_patterns: &[(&regex::Regex, CallTargetKind)] = &[
-        (&regex::Regex::new(r"\b(\w+)\s*\(").unwrap(), CallTargetKind::FreeFunction),
-        (&regex::Regex::new(r"\.(\w+)\s*\(").unwrap(), CallTargetKind::Method),
+        (
+            &regex::Regex::new(r"\b(\w+)\s*\(").unwrap(),
+            CallTargetKind::FreeFunction,
+        ),
+        (
+            &regex::Regex::new(r"\.(\w+)\s*\(").unwrap(),
+            CallTargetKind::Method,
+        ),
     ];
 
     let mut edges = Vec::new();
@@ -116,7 +132,9 @@ fn resolve_calls_regex(
                                 dst_qn: key.1,
                                 edge_type: "CALLS".into(),
                                 properties_json: Some(call_edge_properties_json(
-                                    callee_name, &res, "regex",
+                                    callee_name,
+                                    &res,
+                                    "regex",
                                 )),
                             });
                         }
@@ -268,8 +286,7 @@ mod tests {
         ];
         let src = "from utils import helper as h\n\ndef main():\n    h()\n";
         let registry = build_symbol_registry(&symbols);
-        let edges =
-            resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "main.py");
+        let edges = resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "main.py");
         assert_eq!(edges.len(), 1);
         assert!(edges[0].dst_qn.starts_with("utils.py::"));
     }
@@ -310,15 +327,12 @@ mod tests {
         ];
         let src = "from utils import helper\n\ndef main():\n    helper()\n";
         let registry = build_symbol_registry(&symbols);
-        let edges =
-            resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "main.py");
+        let edges = resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "main.py");
         assert_eq!(edges.len(), 1);
         assert!(edges[0].dst_qn.starts_with("utils.py::"));
-        assert!(
-            edges[0]
-                .properties_json
-                .as_ref()
-                .is_some_and(|p| p.contains("import_binding") || p.contains("ast"))
-        );
+        assert!(edges[0]
+            .properties_json
+            .as_ref()
+            .is_some_and(|p| p.contains("import_binding") || p.contains("ast")));
     }
 }

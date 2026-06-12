@@ -76,7 +76,9 @@ pub fn artifact_exists(repo_path: &Path) -> bool {
     }
     read_metadata(repo_path)
         .map(|m| {
-            m.schema_version >= 0 && m.schema_version <= ARTIFACT_SCHEMA_VERSION && m.original_size > 0
+            m.schema_version >= 0
+                && m.schema_version <= ARTIFACT_SCHEMA_VERSION
+                && m.original_size > 0
         })
         .unwrap_or(false)
 }
@@ -127,9 +129,8 @@ pub fn import_artifact(repo_path: &Path, project: Option<&str>) -> Result<bool> 
         return Ok(false);
     }
 
-    let metadata = read_metadata(repo_path).map_err(|e| {
-        Error::Other(format!("artifact metadata invalid: {e}"))
-    })?;
+    let metadata = read_metadata(repo_path)
+        .map_err(|e| Error::Other(format!("artifact metadata invalid: {e}")))?;
     if metadata.schema_version < 0 || metadata.schema_version > ARTIFACT_SCHEMA_VERSION {
         return Err(Error::Other(format!(
             "artifact schema_version {} incompatible with {}",
@@ -207,9 +208,9 @@ fn read_metadata(repo_path: &Path) -> Result<ArtifactMetadata> {
     let raw = fs::read_to_string(&legacy_path)?;
     let legacy: LegacyManifest = serde_json::from_str(&raw)?;
     let schema_version = legacy.schema_version.unwrap_or(ARTIFACT_SCHEMA_VERSION);
-    let original_size = legacy.bytes_raw.ok_or_else(|| {
-        Error::Other("legacy manifest missing bytes_raw".into())
-    })?;
+    let original_size = legacy
+        .bytes_raw
+        .ok_or_else(|| Error::Other("legacy manifest missing bytes_raw".into()))?;
     let compressed_size = legacy.bytes_compressed.unwrap_or(0);
     Ok(ArtifactMetadata {
         schema_version,

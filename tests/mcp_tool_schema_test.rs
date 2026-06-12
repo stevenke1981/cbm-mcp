@@ -61,8 +61,14 @@ fn property_keys(schema: &Value) -> BTreeSet<String> {
 fn compare_tool(runtime: &Value, spec: &Value, name: &str) -> Vec<String> {
     let mut errors = Vec::new();
 
-    let rt_desc = runtime.get("description").and_then(|v| v.as_str()).unwrap_or("");
-    let spec_desc = spec.get("description").and_then(|v| v.as_str()).unwrap_or("");
+    let rt_desc = runtime
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let spec_desc = spec
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if rt_desc != spec_desc {
         errors.push(format!("{name}: description mismatch (runtime vs spec)"));
     }
@@ -81,7 +87,9 @@ fn compare_tool(runtime: &Value, spec: &Value, name: &str) -> Vec<String> {
     let rt_props = property_keys(rt_schema);
     let spec_props = property_keys(spec_schema);
     for key in spec_props.difference(&rt_props) {
-        errors.push(format!("{name}: runtime schema missing property `{key}` from spec"));
+        errors.push(format!(
+            "{name}: runtime schema missing property `{key}` from spec"
+        ));
     }
 
     errors

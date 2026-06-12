@@ -205,7 +205,8 @@ fn collect_outbound_http_paths(store: &Store) -> Result<Vec<(String, String)>> {
         .filter(|s| s.label == "Function")
         .collect();
     let url_patterns = [
-        Regex::new(r#"(?i)(?:fetch|axios|request|httpx?|reqwest)[^"';\n]*["']([^"']+)["']"#).unwrap(),
+        Regex::new(r#"(?i)(?:fetch|axios|request|httpx?|reqwest)[^"';\n]*["']([^"']+)["']"#)
+            .unwrap(),
         Regex::new(r#"(?i)\.(get|post|put|delete|patch)\(\s*["']([^"']+)["']"#).unwrap(),
         Regex::new(r#"["'](/[\w./-]+)["']"#).unwrap(),
     ];

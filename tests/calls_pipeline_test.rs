@@ -205,7 +205,11 @@ fn c_pipeline_resolves_local_call_with_ast_metadata() {
 fn c_pipeline_skips_ambiguous_cross_file_calls() {
     let (_guard, _cache, _) = isolated_cache();
     let dir = TempDir::new().unwrap();
-    std::fs::write(dir.path().join("main.c"), "int main() { helper(); return 0; }\n").unwrap();
+    std::fs::write(
+        dir.path().join("main.c"),
+        "int main() { helper(); return 0; }\n",
+    )
+    .unwrap();
     std::fs::write(dir.path().join("a.c"), "void helper() {}\n").unwrap();
     std::fs::write(dir.path().join("b.c"), "void helper() {}\n").unwrap();
 
@@ -238,7 +242,9 @@ fn php_pipeline_skips_ambiguous_cross_file_calls() {
     std::fs::write(dir.path().join("b.php"), "<?php\nfunction helper() {}\n").unwrap();
 
     let pipeline = Pipeline::new(IndexMode::Full);
-    let index = pipeline.run(dir.path(), Some("php-ambiguous-calls")).unwrap();
+    let index = pipeline
+        .run(dir.path(), Some("php-ambiguous-calls"))
+        .unwrap();
     let store = Store::open(&index.project).unwrap();
 
     let main_calls: Vec<_> = calls_edges(&store)

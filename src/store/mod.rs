@@ -84,7 +84,8 @@ impl Store {
         if self.bulk_write.get() {
             return Err(Error::Other("bulk write already active".into()));
         }
-        self.conn.execute_batch("PRAGMA synchronous=OFF; BEGIN IMMEDIATE;")?;
+        self.conn
+            .execute_batch("PRAGMA synchronous=OFF; BEGIN IMMEDIATE;")?;
         self.bulk_write.set(true);
         Ok(())
     }
@@ -94,7 +95,8 @@ impl Store {
         if !self.bulk_write.get() {
             return Err(Error::Other("no active bulk write".into()));
         }
-        self.conn.execute_batch("COMMIT; PRAGMA synchronous=NORMAL;")?;
+        self.conn
+            .execute_batch("COMMIT; PRAGMA synchronous=NORMAL;")?;
         self.bulk_write.set(false);
         Ok(())
     }
@@ -104,7 +106,9 @@ impl Store {
         if !self.bulk_write.get() {
             return Ok(());
         }
-        let _ = self.conn.execute_batch("ROLLBACK; PRAGMA synchronous=NORMAL;");
+        let _ = self
+            .conn
+            .execute_batch("ROLLBACK; PRAGMA synchronous=NORMAL;");
         self.bulk_write.set(false);
         Ok(())
     }
@@ -314,7 +318,8 @@ impl Store {
     }
 
     pub fn insert_edges_batch(&self, edges: &[Edge]) -> Result<()> {
-        let sql = "INSERT OR IGNORE INTO edges (src_qn, dst_qn, edge_type, project, properties_json)
+        let sql =
+            "INSERT OR IGNORE INTO edges (src_qn, dst_qn, edge_type, project, properties_json)
              VALUES (?1, ?2, ?3, ?4, ?5)";
         if self.in_bulk_write() {
             for edge in edges {
@@ -374,9 +379,9 @@ impl Store {
 
     /// Files whose on-disk mtime/size differ from the last indexed fingerprint.
     pub fn files_with_fingerprint_drift(&self, repo_path: &std::path::Path) -> Result<Vec<String>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT path, mtime_ns, size_bytes FROM files WHERE project = ?1",
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT path, mtime_ns, size_bytes FROM files WHERE project = ?1")?;
         let rows = stmt
             .query_map(params![self.project], |row| {
                 Ok((

@@ -59,9 +59,7 @@ impl GraphBuffer {
         );
         if !self.edge_keys.insert(key) {
             if let Some(existing) = self.edges.iter_mut().find(|e| {
-                e.src_qn == edge.src_qn
-                    && e.dst_qn == edge.dst_qn
-                    && e.edge_type == edge.edge_type
+                e.src_qn == edge.src_qn && e.dst_qn == edge.dst_qn && e.edge_type == edge.edge_type
             }) {
                 if edge.properties_json.is_some() {
                     existing.properties_json = edge.properties_json;
@@ -83,11 +81,8 @@ impl GraphBuffer {
         self.edges.retain(|e| {
             let keep = e.edge_type != edge_type;
             if !keep {
-                self.edge_keys.remove(&(
-                    e.src_qn.clone(),
-                    e.dst_qn.clone(),
-                    e.edge_type.clone(),
-                ));
+                self.edge_keys
+                    .remove(&(e.src_qn.clone(), e.dst_qn.clone(), e.edge_type.clone()));
             }
             keep
         });
@@ -192,12 +187,10 @@ mod tests {
         assert!(buf.insert_edge(e1));
         assert!(!buf.insert_edge(e2));
         assert_eq!(buf.edge_count(), 1);
-        assert!(
-            buf.edges[0]
-                .properties_json
-                .as_ref()
-                .is_some_and(|p| p.contains("\"v\":2"))
-        );
+        assert!(buf.edges[0]
+            .properties_json
+            .as_ref()
+            .is_some_and(|p| p.contains("\"v\":2")));
     }
 
     #[test]

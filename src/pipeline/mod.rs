@@ -13,14 +13,14 @@ mod routes;
 mod structure;
 
 pub use calls::*;
+pub use communities::*;
 pub use cross_repo::{parse_target_projects, run_cross_repo_intelligence, CrossRepoResult};
+pub use extract::*;
 pub use graph_buffer::GraphBuffer;
 pub use import_map::ImportMap;
-pub use registry::{CallResolution, FileCallResolver, SymbolRegistry};
-pub use communities::*;
-pub use extract::*;
 pub use imports::*;
 pub use inheritance::*;
+pub use registry::{CallResolution, FileCallResolver, SymbolRegistry};
 pub use routes::*;
 pub use structure::*;
 
@@ -270,26 +270,26 @@ impl Pipeline {
             }
 
             let file_results: Vec<FileIndexResult> = files
-            .par_iter()
-            .filter_map(|file| {
-                let size = file.path.metadata().map(|m| m.len() as usize).unwrap_or(0);
-                if size > 0 && !budget.try_reserve(size) {
-                    warn!(file = %file.relative_path, "skipped file: memory budget exceeded");
-                    return None;
-                }
-                let result = self.index_file(file);
-                if size > 0 {
-                    budget.release(size);
-                }
-                match result {
-                    Ok(r) => Some(r),
-                    Err(e) => {
-                        warn!(file = %file.relative_path, error = %e, "index file failed");
-                        None
+                .par_iter()
+                .filter_map(|file| {
+                    let size = file.path.metadata().map(|m| m.len() as usize).unwrap_or(0);
+                    if size > 0 && !budget.try_reserve(size) {
+                        warn!(file = %file.relative_path, "skipped file: memory budget exceeded");
+                        return None;
                     }
-                }
-            })
-            .collect();
+                    let result = self.index_file(file);
+                    if size > 0 {
+                        budget.release(size);
+                    }
+                    match result {
+                        Ok(r) => Some(r),
+                        Err(e) => {
+                            warn!(file = %file.relative_path, error = %e, "index file failed");
+                            None
+                        }
+                    }
+                })
+                .collect();
 
             let mut graph = GraphBuffer::new(project_name, repo_path.to_string_lossy().as_ref());
             let mut all_symbols = Vec::new();
@@ -299,8 +299,7 @@ impl Pipeline {
                 graph.upsert_symbols_batch(&result.symbols);
             }
 
-            let structural_edges =
-                finalize_graph_buffer(&mut graph, repo_path, project_name)?;
+            let structural_edges = finalize_graph_buffer(&mut graph, repo_path, project_name)?;
             graph.flush_to_store(&store)?;
 
             let semantic = if semantic::should_run(self.mode) {
@@ -315,9 +314,8 @@ impl Pipeline {
             apply_communities(&store)?;
             store.set_meta("semantic_enabled", &semantic::is_enabled().to_string())?;
 
-            let call_edges = structural_edges
-                + semantic.similar_edges
-                + semantic.semantically_related_edges;
+            let call_edges =
+                structural_edges + semantic.similar_edges + semantic.semantically_related_edges;
 
             let duration_ms = start.elapsed().as_millis() as u64;
             info!(

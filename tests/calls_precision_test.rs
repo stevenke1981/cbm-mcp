@@ -108,7 +108,5 @@ fn regex_fallback_marks_method_metadata() {
     assert!(v["confidence"].is_number());
     assert_eq!(v["strategy"], "same_file");
     assert_eq!(v["candidates"], 1);
-    assert!(
-        v["method"].as_str() == Some("ast") || v["method"].as_str() == Some("regex")
-    );
+    assert!(v["method"].as_str() == Some("ast") || v["method"].as_str() == Some("regex"));
 }

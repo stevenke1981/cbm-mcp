@@ -37,7 +37,11 @@ fn python_pipeline_resolves_imported_cross_file_helper() {
         .into_iter()
         .filter(|e| e.src_qn.contains("main.py::Function::main@"))
         .collect();
-    assert_eq!(main_calls.len(), 1, "expected one CALLS from main: {main_calls:?}");
+    assert_eq!(
+        main_calls.len(),
+        1,
+        "expected one CALLS from main: {main_calls:?}"
+    );
     assert!(
         main_calls[0].dst_qn.starts_with("utils.py::"),
         "should resolve to utils.helper, got {}",
@@ -79,7 +83,9 @@ fn python_pipeline_resolves_imported_class_method_via_lsp_cross() {
         .filter(|e| e.src_qn.contains("main.py::Function::main@"))
         .collect();
     assert!(
-        main_calls.iter().any(|e| e.dst_qn.starts_with("greeter.py::")),
+        main_calls
+            .iter()
+            .any(|e| e.dst_qn.starts_with("greeter.py::")),
         "expected CALLS to greeter.py method, got {main_calls:?}"
     );
     assert!(
@@ -170,7 +176,11 @@ fn php_pipeline_resolves_required_helper_over_ambiguous_decoys() {
         "<?php\nrequire_once 'helper.php';\n\nfunction main() {\n    helper();\n}\n",
     )
     .unwrap();
-    std::fs::write(dir.path().join("helper.php"), "<?php\nfunction helper() {}\n").unwrap();
+    std::fs::write(
+        dir.path().join("helper.php"),
+        "<?php\nfunction helper() {}\n",
+    )
+    .unwrap();
     std::fs::write(dir.path().join("a.php"), "<?php\nfunction helper() {}\n").unwrap();
     std::fs::write(dir.path().join("b.php"), "<?php\nfunction helper() {}\n").unwrap();
 
@@ -182,7 +192,11 @@ fn php_pipeline_resolves_required_helper_over_ambiguous_decoys() {
         .into_iter()
         .filter(|e| e.src_qn.contains("main.php::") && e.src_qn.contains("::main@"))
         .collect();
-    assert_eq!(main_calls.len(), 1, "expected one CALLS from main: {main_calls:?}");
+    assert_eq!(
+        main_calls.len(),
+        1,
+        "expected one CALLS from main: {main_calls:?}"
+    );
     assert!(
         main_calls[0].dst_qn.starts_with("helper.php::"),
         "require_once should prefer required helper.php, got {}",
@@ -300,7 +314,9 @@ fn java_pipeline_skips_ambiguous_cross_file_greeter_without_import() {
     .unwrap();
 
     let pipeline = Pipeline::new(IndexMode::Full);
-    let index = pipeline.run(dir.path(), Some("java-ambiguous-lsp")).unwrap();
+    let index = pipeline
+        .run(dir.path(), Some("java-ambiguous-lsp"))
+        .unwrap();
     let store = Store::open(&index.project).unwrap();
 
     let main_calls: Vec<_> = calls_edges(&store)
@@ -309,7 +325,8 @@ fn java_pipeline_skips_ambiguous_cross_file_greeter_without_import() {
         .collect();
     assert!(
         main_calls.iter().all(|e| {
-            !e.dst_qn.contains("greeter/Greeter.java::") && !e.dst_qn.contains("decoy/Greeter.java::")
+            !e.dst_qn.contains("greeter/Greeter.java::")
+                && !e.dst_qn.contains("decoy/Greeter.java::")
         }),
         "unimported ambiguous Greeter should not lsp_cross link: {main_calls:?}"
     );

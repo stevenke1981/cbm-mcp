@@ -37,7 +37,11 @@ fn python_import_alias_resolves_aliased_helper() {
         .into_iter()
         .filter(|e| e.src_qn.contains("main.py::Function::main@"))
         .collect();
-    assert_eq!(main_calls.len(), 1, "expected aliased import CALLS: {main_calls:?}");
+    assert_eq!(
+        main_calls.len(),
+        1,
+        "expected aliased import CALLS: {main_calls:?}"
+    );
     assert!(
         main_calls[0].dst_qn.starts_with("utils.py::"),
         "alias h should resolve to utils.helper, got {}",
@@ -67,7 +71,11 @@ fn javascript_import_alias_resolves_aliased_helper() {
         .into_iter()
         .filter(|e| e.src_qn.contains("main.js::Function::main@"))
         .collect();
-    assert_eq!(main_calls.len(), 1, "expected aliased import CALLS: {main_calls:?}");
+    assert_eq!(
+        main_calls.len(),
+        1,
+        "expected aliased import CALLS: {main_calls:?}"
+    );
     assert!(
         main_calls[0].dst_qn.starts_with("utils.js::"),
         "alias h should resolve to utils.helper, got {}",
@@ -88,14 +96,20 @@ fn java_overloaded_like_methods_resolve_within_same_class() {
     .unwrap();
 
     let pipeline = Pipeline::new(IndexMode::Full);
-    let index = pipeline.run(dir.path(), Some("java-overload-like")).unwrap();
+    let index = pipeline
+        .run(dir.path(), Some("java-overload-like"))
+        .unwrap();
     let store = Store::open(&index.project).unwrap();
 
     let run_calls: Vec<_> = calls_edges(&store)
         .into_iter()
         .filter(|e| e.src_qn.contains("App.java::") && e.src_qn.contains("::run@"))
         .collect();
-    assert_eq!(run_calls.len(), 1, "expected scoped class CALLS: {run_calls:?}");
+    assert_eq!(
+        run_calls.len(),
+        1,
+        "expected scoped class CALLS: {run_calls:?}"
+    );
     assert!(
         run_calls[0].dst_qn.contains("::helper@") && run_calls[0].dst_qn.contains("App.java::"),
         "A.run should call A.helper, got {}",
@@ -117,7 +131,9 @@ fn javascript_console_log_does_not_link_decoy_log_function() {
     std::fs::write(dir.path().join("decoy.js"), "function log() {}\n").unwrap();
 
     let pipeline = Pipeline::new(IndexMode::Full);
-    let index = pipeline.run(dir.path(), Some("js-framework-noise")).unwrap();
+    let index = pipeline
+        .run(dir.path(), Some("js-framework-noise"))
+        .unwrap();
     let store = Store::open(&index.project).unwrap();
 
     let main_calls: Vec<_> = calls_edges(&store)

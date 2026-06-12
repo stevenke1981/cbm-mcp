@@ -30,8 +30,18 @@ fn export_writes_reference_style_metadata() {
         meta.get("schema_version").and_then(|v| v.as_i64()),
         Some(ARTIFACT_SCHEMA_VERSION as i64)
     );
-    assert!(meta.get("original_size").and_then(|v| v.as_u64()).unwrap_or(0) > 0);
-    assert!(meta.get("compressed_size").and_then(|v| v.as_u64()).unwrap_or(0) > 0);
+    assert!(
+        meta.get("original_size")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            > 0
+    );
+    assert!(
+        meta.get("compressed_size")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            > 0
+    );
     assert!(meta.get("nodes").and_then(|v| v.as_i64()).unwrap_or(0) >= 1);
 }
 

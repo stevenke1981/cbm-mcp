@@ -111,9 +111,7 @@ fn mcp_process_initialize_tools_list_snapshot_and_call() {
     assert_eq!(init_resp.get("id"), Some(&Value::from(1)));
     let result = init_resp.get("result").expect("initialize result");
     assert_eq!(
-        result
-            .pointer("/serverInfo/name")
-            .and_then(|v| v.as_str()),
+        result.pointer("/serverInfo/name").and_then(|v| v.as_str()),
         Some("codebase-memory-mcp")
     );
 

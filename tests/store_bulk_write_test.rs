@@ -62,12 +62,10 @@ fn bulk_write_commit_persists_staged_graph() {
     store.commit_bulk_write().unwrap();
 
     assert_eq!(store.count_symbols().unwrap(), 1);
-    assert!(
-        store
-            .find_symbol("lib.rs::Function::fresh@L1")
-            .unwrap()
-            .is_some()
-    );
+    assert!(store
+        .find_symbol("lib.rs::Function::fresh@L1")
+        .unwrap()
+        .is_some());
     assert!(store.count_edges_by_type("CALLS").unwrap() >= 1);
 }
 

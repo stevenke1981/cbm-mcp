@@ -196,9 +196,10 @@ impl ToolHandler {
 
         match git::status(&repo) {
             Ok(st) => {
-                let changed =
-                    git::collect_incremental_paths(&repo, indexed_head.as_deref(), &st);
-                let hash_drift = store.files_with_fingerprint_drift(&repo).unwrap_or_default();
+                let changed = git::collect_incremental_paths(&repo, indexed_head.as_deref(), &st);
+                let hash_drift = store
+                    .files_with_fingerprint_drift(&repo)
+                    .unwrap_or_default();
                 Ok(json!({
                     "project": project,
                     "dirty": st.dirty,
@@ -291,7 +292,6 @@ impl ToolHandler {
             }
         }
     }
-
 }
 
 const ADR_EMPTY_HINT: &str = "No ADR yet. Create one with manage_adr(mode='update', \
@@ -375,5 +375,3 @@ impl Drop for PipelineGuard {
         self.busy.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }
-
-

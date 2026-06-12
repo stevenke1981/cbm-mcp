@@ -51,8 +51,7 @@ impl SymbolRegistry {
         self.exact
             .insert(sym.qualified_name.clone(), sym.label.clone());
         if let Some(parent) = parent_class_from_props(&sym.properties_json) {
-            self.parent_class
-                .insert(sym.qualified_name.clone(), parent);
+            self.parent_class.insert(sym.qualified_name.clone(), parent);
         }
         let simple = simple_name(&sym.qualified_name);
         self.by_name
@@ -68,7 +67,10 @@ impl SymbolRegistry {
     pub fn candidates(&self, callee_name: &str) -> &[String] {
         static EMPTY: Vec<String> = Vec::new();
         let lookup = simple_name(callee_name);
-        self.by_name.get(&lookup).map(Vec::as_slice).unwrap_or(&EMPTY)
+        self.by_name
+            .get(&lookup)
+            .map(Vec::as_slice)
+            .unwrap_or(&EMPTY)
     }
 
     pub fn symbol_label(&self, qn: &str) -> Option<&str> {
@@ -97,7 +99,12 @@ impl SymbolRegistry {
         }
     }
 
-    pub fn resolve(&self, callee_name: &str, caller_file: &str, imports: &ImportMap) -> Option<CallResolution> {
+    pub fn resolve(
+        &self,
+        callee_name: &str,
+        caller_file: &str,
+        imports: &ImportMap,
+    ) -> Option<CallResolution> {
         self.resolve_kind(callee_name, caller_file, imports, CallTargetKind::Any)
     }
 
@@ -132,10 +139,7 @@ impl SymbolRegistry {
         if let Some(parent) = parent_class {
             let scoped: Vec<String> = candidates
                 .iter()
-                .filter(|qn| {
-                    self.candidate_parent_class(qn)
-                        .is_some_and(|p| p == parent)
-                })
+                .filter(|qn| self.candidate_parent_class(qn).is_some_and(|p| p == parent))
                 .cloned()
                 .collect();
             if !scoped.is_empty() {
@@ -302,8 +306,12 @@ fn qn_belongs_to_module(qn: &str, module_path: &str) -> bool {
     norm_file == norm_mod
         || norm_file.ends_with(&norm_mod)
         || norm_mod.ends_with(&norm_file)
-        || norm_file.strip_suffix(".py").is_some_and(|s| norm_mod.starts_with(s))
-        || norm_mod.strip_suffix(".py").is_some_and(|s| norm_file.starts_with(s))
+        || norm_file
+            .strip_suffix(".py")
+            .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_mod
+            .strip_suffix(".py")
+            .is_some_and(|s| norm_file.starts_with(s))
 }
 
 fn best_candidate<'a>(candidates: &'a [String], caller_file: &str) -> Option<&'a str> {
@@ -405,10 +413,8 @@ mod tests {
 
     #[test]
     fn resolves_same_file_helper() {
-        let reg = SymbolRegistry::from_symbols(&[
-            sym("main.py", "main", 4),
-            sym("main.py", "helper", 1),
-        ]);
+        let reg =
+            SymbolRegistry::from_symbols(&[sym("main.py", "main", 4), sym("main.py", "helper", 1)]);
         let imports = ImportMap::default();
         let res = reg.resolve("helper", "main.py", &imports).unwrap();
         assert_eq!(res.strategy, "same_file");
@@ -423,9 +429,7 @@ mod tests {
             sym("decoy.py", "helper", 1),
         ]);
         let mut imports = ImportMap::default();
-        imports
-            .bindings
-            .insert("helper".into(), "utils.py".into());
+        imports.bindings.insert("helper".into(), "utils.py".into());
         let res = reg.resolve("helper", "main.py", &imports).unwrap();
         assert_eq!(res.strategy, "import_binding");
         assert!(res.qn.starts_with("utils.py::"));
@@ -491,12 +495,8 @@ mod tests {
             sym("decoy.py", "helper", 1),
         ]);
         let mut imports = ImportMap::default();
-        imports
-            .bindings
-            .insert("h".into(), "utils.py".into());
-        imports
-            .symbol_aliases
-            .insert("h".into(), "helper".into());
+        imports.bindings.insert("h".into(), "utils.py".into());
+        imports.symbol_aliases.insert("h".into(), "helper".into());
         let res = reg.resolve("h", "main.py", &imports).unwrap();
         assert_eq!(res.strategy, "import_binding");
         assert!(res.qn.starts_with("utils.py::"));
