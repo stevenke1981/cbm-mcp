@@ -16,7 +16,7 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Next P0 slices:** LSP cross-file Java · method disambiguation · negative CALLS fixtures.
 
-**Done recently:** Python `lsp_cross` pass · MCP process smoke · `manage_adr` mode=sections · project rename `cbm-mcp`.
+**Done recently:** `lsp_cross` Py/JS/Go · MCP process smoke · `manage_adr` · `cbm-mcp` rename.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
