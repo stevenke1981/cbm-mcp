@@ -2,16 +2,17 @@
 
 Independent Rust implementation of **[codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)** — knowledge-graph indexer and MCP server for AI coding agents.
 
-**RLM map-reduce tools are not included.** Use the separate **[codebase-memory-rlm-mcp](../rlm-mcp)** server alongside this binary.
+**RLM tools are not included.** For long-text map-reduce, use the separate **[codebase-memory-rlm-mcp](https://github.com/stevenke1981/rlm-mcp)** MCP server (independent project).
 
 ## Relationship to other repos
 
-| Path | Role |
-|------|------|
-| `D:\cbm-mcp` | **This repo** — graph indexing, 14 MCP tools, SQLite store |
-| `D:\rlm-mcp` | RLM orchestration MCP (calls this server via MCP client) |
-| `D:\cbm\cbrlm` | Legacy combined binary (deprecated; split into the two repos above) |
-| `D:\_cbm-ref` | Reference C implementation (full parity target) |
+| Path | MCP server | Role |
+|------|------------|------|
+| `D:\cbm-mcp` | `codebase-memory-mcp` | **This repo** — graph indexing, 14 MCP tools |
+| `D:\rlm-mcp` | `codebase-memory-rlm-mcp` | Standalone RLM sessions (scan/peek/chunk) |
+| `D:\cbm\cbrlm` | `cbrlm-mcp` (legacy) | Deprecated combined binary |
+
+The two servers are **not integrated** — enable both in the agent only if you want graph search **and** RLM sessions.
 
 ## Quick start
 
@@ -35,12 +36,28 @@ codebase-memory-mcp
 # MCP server name: codebase-memory-mcp
 ```
 
-### With RLM
+### Optional: with codebase-memory-rlm-mcp
 
-Register **both** servers in your agent config:
+Register **two independent** MCP servers when you need both graph and RLM:
 
-1. `codebase-memory-mcp` — index, search, trace, snippets
-2. `codebase-memory-rlm-mcp` (from `D:\rlm-mcp`) — `rlm_workflow`, `rlm_filter`, `rlm_scan`, …
+```json
+{
+  "mcp": {
+    "codebase-memory-mcp": {
+      "type": "local",
+      "command": ["codebase-memory-mcp"],
+      "enabled": true
+    },
+    "codebase-memory-rlm-mcp": {
+      "type": "local",
+      "command": ["codebase-memory-rlm-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+See [`packaging/mcp/dual-servers.example.json`](packaging/mcp/dual-servers.example.json) and [rlm-mcp](https://github.com/stevenke1981/rlm-mcp).
 
 ## MCP tools (14)
 
@@ -48,7 +65,7 @@ Register **both** servers in your agent config:
 
 ## Full clone status
 
-This is a **Rust MVP** toward full reference parity with `D:\_cbm-ref`. See [`CLONE_ROADMAP.md`](CLONE_ROADMAP.md) and [`PARITY_MATRIX.md`](PARITY_MATRIX.md).
+Rust MVP toward full reference parity with `D:\_cbm-ref`. See [`CLONE_ROADMAP.md`](CLONE_ROADMAP.md) and [`PARITY_MATRIX.md`](PARITY_MATRIX.md).
 
 ## Environment
 

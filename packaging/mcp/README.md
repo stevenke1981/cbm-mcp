@@ -1,97 +1,54 @@
-# CBRLM MCP package
+# codebase-memory-mcp MCP package
 
-This directory is the handoff package for agents and MCP clients that want to use CBRLM as `cbrlm-mcp`.
+Handoff templates for agents wiring **codebase-memory-mcp** (graph index only).
 
-Server name: `cbrlm-mcp`
-
-Transport: stdio
-
-Binary: `cbrlm` or an absolute path to `cbrlm.exe` / `cbrlm`
+Server name: `codebase-memory-mcp`  
+Transport: stdio  
+Binary: `codebase-memory-mcp` or absolute path to the release binary
 
 ## Fast path
 
-Build or install the binary first:
-
 ```powershell
 cargo build --release
-.\target\release\cbrlm.exe install --yes --all
+.\target\release\codebase-memory-mcp.exe install --yes --all
 ```
 
-Then restart the target agent.
-
-The installer writes native config for OpenCode, Codex, Claude-style `mcpServers` clients, Gemini CLI, Zed, and a fallback MCP JSON file.
+Restart the target agent after install.
 
 ## Manual config
 
-Use these templates when an agent cannot run the installer:
-
 | Template | Target |
 |----------|--------|
-| `generic-mcp.json` | Claude-style `mcpServers` clients, Gemini CLI, Zed, Aider-like clients |
+| `generic-mcp.json` | Claude-style `mcpServers`, Gemini CLI, Zed |
 | `codex-config.toml` | Codex `config.toml` snippet |
 | `opencode.json` | OpenCode `opencode.json` snippet |
-| `claude-settings.json` | Claude Code / Claude Desktop-style settings |
-| `manifest.json` | Machine-readable package summary for agents |
+| `claude-settings.json` | Claude Code / Desktop settings |
+| `manifest.json` | Machine-readable package summary |
+| `dual-servers.example.json` | Optional second server: `codebase-memory-rlm-mcp` |
 
-Replace `{{CBRLM_BINARY}}` with an absolute binary path.
+Replace `{{CBM_BINARY}}` with an absolute binary path.
 
-Windows example:
-
-```text
-C:\Users\you\.config\cbrlm\bin\cbrlm.exe
-```
-
-Unix example:
-
-```text
-/home/you/.config/cbrlm/bin/cbrlm
-```
-
-`opencode.json` uses a direct command array. If your OpenCode setup keeps the server under an existing `cbm` key, update that key's `command` value instead of adding a second server.
-
-## Required environment
-
-All templates include:
+## Environment
 
 ```json
 {
-  "CBRLM_PROJECT_PREFIX": "cbrlm+",
-  "CBRLM_AGENT": "generic"
+  "CBM_PROJECT_PREFIX": "cbm+",
+  "CBM_AGENT": "generic"
 }
 ```
 
-Agents may change `CBRLM_AGENT` to their own slug, for example `codex`, `opencode`, or `claude-code`.
+Legacy aliases `CBRLM_*` are still accepted by the binary.
 
-## Smoke test
+## Tool contract (14 graph tools)
 
-After wiring an MCP client, verify the server exposes tools:
+`index_repository`, `index_status`, `search_graph`, `trace_path`, `get_code_snippet`, `get_graph_schema`, `get_architecture`, `query_graph`, `search_code`, `list_projects`, `delete_project`, `detect_changes`, `manage_adr`, `ingest_traces`
 
-```powershell
-.\target\release\cbrlm.exe --version
-.\target\release\cbrlm.exe cli list_projects --json --quiet "{}"
-.\scripts\smoke-release-artifact.ps1 -SkipBuild
-```
+Use graph tools before broad file search when a project is indexed.
 
-The release smoke includes a minimal MCP `initialize` and `tools/list` round trip.
+## RLM (separate project)
 
-## Tool contract
+RLM session tools (`rlm_scan`, `rlm_peek`, `rlm_chunk`, `rlm_workflow`, …) live in **[rlm-mcp](https://github.com/stevenke1981/rlm-mcp)** as MCP server **`codebase-memory-rlm-mcp`**.
 
-Primary discovery tools:
-
-1. `index_repository`
-2. `search_graph`
-3. `trace_path`
-4. `get_code_snippet`
-5. `query_graph`
-6. `get_architecture`
-
-RLM helpers:
-
-1. `rlm_scan`
-2. `rlm_chunk`
-3. `rlm_peek`
-4. `rlm_filter`
-5. `rlm_read_symbol`
-6. `rlm_workflow`
-
-Use graph tools before broad file search whenever a project is indexed.
+- Not bundled with this binary
+- No code dependency between repos
+- Optional: enable both servers in the same agent (see `dual-servers.example.json`)

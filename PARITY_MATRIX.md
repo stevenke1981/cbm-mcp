@@ -76,8 +76,7 @@ Last updated: 2026-06-12 (Section 7 review applied).
 | `get_graph_schema` | Done | Honest `implemented_edge_types` |
 | `get_architecture` | MVP | Counts, communities (components) |
 | `query_graph` | Done | SELECT-only guard |
-| `rlm_scan` / `rlm_chunk` | Done | Persisted sessions across CLI invocations |
-| `rlm_*` (other) | Partial | Workflow hints |
+| RLM tools (`rlm_*`) | N/A | Moved to [rlm-mcp](https://github.com/stevenke1981/rlm-mcp) (`codebase-memory-rlm-mcp`) |
 
 ## Semantic system (11 signals — MVP scoring)
 
@@ -99,7 +98,7 @@ All 11 reference signals contribute to `combined` score. Thresholds: `SIMILAR_TO
 
 | # | Item | Status |
 |---|------|--------|
-| 6.1 | CLI `rlm_scan` session persistence | Done |
+| 6.1 | RLM session persistence | N/A (rlm-mcp repo) |
 | 6.2 | Docs without stale test counts | Done |
 | 6.3 | MVP vs full parity distinction | Done |
 | 6.4 | Release artifact smoke | Done |
@@ -115,7 +114,7 @@ All 11 reference signals contribute to `combined` score. Thresholds: `SIMILAR_TO
 | 7.1 | Matrix-aware release artifact smoke | Done |
 | 7.2 | `cargo fmt --check` in CI/smoke gates | Done |
 | 7.3 | Process-level CLI JSON tests | Done |
-| 7.4 | Atomic RLM session persistence | Done |
+| 7.4 | Atomic RLM session persistence | N/A (rlm-mcp repo) |
 | 7.5 | Full-pipeline CALLS fixtures | Done |
 | 7.6 | Installer + MCP smoke from release artifact | Done |
 | 7.7 | MVP vs replica project language | Done |

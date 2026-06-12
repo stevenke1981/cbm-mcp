@@ -5,7 +5,7 @@ Target: feature-equivalent Rust rewrite of `D:\_cbm-ref` (DeusData/codebase-memo
 ## Architecture split (done)
 
 - **cbm-mcp** (`D:\cbm-mcp`) — this repo; 14 graph MCP tools only
-- **rlm-mcp** (`D:\rlm-mcp`) — RLM orchestration; separate MCP server
+- **rlm-mcp** (`D:\rlm-mcp`) — standalone `codebase-memory-rlm-mcp` (scan/peek/chunk); no CBM coupling
 
 ## P0 — graph correctness
 
