@@ -175,7 +175,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 - [ ] Python LSP-assisted resolution
 - [ ] TypeScript/JavaScript LSP
 - [ ] Go LSP
-- [ ] Java LSP
+- [x] Java LSP cross-file MVP (`lsp_cross.rs` + `import_map` + pipeline fixtures)
 - [ ] C/C++ LSP (+ compile_commands)
 - [ ] C# LSP
 - [ ] PHP LSP

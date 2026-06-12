@@ -1,7 +1,7 @@
 //! Cross-file LSP-style call resolution (reference `pass_lsp_cross.c` parity slice).
 //!
 //! In-process type-aware resolver — not an external language-server subprocess.
-//! Supports Python, JavaScript/TypeScript, and Go imported-type method dispatch.
+//! Supports Python, JavaScript/TypeScript, Go, and Java imported-type method dispatch.
 
 use crate::pipeline::import_map::ImportMap;
 use crate::pipeline::registry::{confidence_band, CallResolution};
@@ -86,6 +86,23 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
                     &methods_by_file,
                 ));
             }
+            "java" => {
+                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let bindings = infer_java_type_bindings(&file.content, &imports);
+                edges.extend(resolve_attribute_calls(
+                    AttributeCallConfig {
+                        language: tree_sitter_java::LANGUAGE.into(),
+                        query_src: JAVA_ATTR_QUERY,
+                    },
+                    &file.path,
+                    &file.content,
+                    &file_syms,
+                    &imports,
+                    &bindings,
+                    &class_index,
+                    &methods_by_file,
+                ));
+            }
             _ => {}
         }
     }
@@ -111,6 +128,12 @@ const GO_ATTR_QUERY: &str = r#"
   function: (selector_expression
     operand: (_) @recv
     field: (field_identifier) @method))
+"#;
+
+const JAVA_ATTR_QUERY: &str = r#"
+(method_invocation
+  object: (_) @recv
+  name: (identifier) @method)
 "#;
 
 struct AttributeCallConfig {
@@ -201,6 +224,22 @@ fn infer_js_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String,
         let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
         if !var.is_empty() && !class_name.is_empty() {
             bindings.entry(var.to_string()).or_insert(class_name.to_string());
+        }
+    }
+    bindings
+}
+
+fn infer_java_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
+    let mut bindings = import_name_bindings(imports);
+    let assign_re = regex::Regex::new(
+        r"(?m)(\w+)\s+(\w+)\s*=\s*new\s+(\w+)\s*\(",
+    )
+    .expect("java assign regex");
+    for cap in assign_re.captures_iter(content) {
+        let var = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        let class_name = cap.get(3).map(|m| m.as_str()).unwrap_or("");
+        if !var.is_empty() && !class_name.is_empty() {
+            bindings.insert(var.to_string(), class_name.to_string());
         }
     }
     bindings
@@ -349,6 +388,21 @@ fn infer_receiver_class(
             }
             None
         }
+        "object_creation_expression" => {
+            let type_node = recv.child_by_field_name("type")?;
+            java_type_name(type_node, content)
+        }
+        _ => None,
+    }
+}
+
+fn java_type_name(node: tree_sitter::Node, content: &str) -> Option<String> {
+    match node.kind() {
+        "type_identifier" | "identifier" => node.utf8_text(content.as_bytes()).ok().map(str::to_string),
+        "scoped_type_identifier" => {
+            let text = node.utf8_text(content.as_bytes()).ok()?;
+            text.rsplit('.').next().map(str::to_string)
+        }
         _ => None,
     }
 }
@@ -441,6 +495,9 @@ fn path_matches(file: &str, module: &str) -> bool {
         || norm_file
             .strip_suffix(".go")
             .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".java")
+            .is_some_and(|s| norm_mod.starts_with(s))
 }
 
 fn push_lsp_edge(
@@ -521,6 +578,26 @@ mod tests {
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);
         assert!(edges[0].dst_qn.starts_with("greeter.js::"));
+        assert!(edges[0].dst_qn.contains("greet"));
+    }
+
+    #[test]
+    fn resolves_imported_java_class_method() {
+        let symbols = vec![
+            sym("Main.java", "Function", "main", 4),
+            sym("greeter/Greeter.java", "Class", "Greeter", 1),
+            sym("greeter/Greeter.java", "Function", "greet", 2),
+        ];
+        let files = vec![SourceFile {
+            path: "Main.java".into(),
+            language: "java".into(),
+            content: "import greeter.Greeter;\n\nclass Main {\n  void main() {\n    new Greeter().greet();\n  }\n}\n"
+                .into(),
+            line_count: 7,
+        }];
+        let edges = resolve_cross_file_calls(&symbols, &files);
+        assert_eq!(edges.len(), 1);
+        assert!(edges[0].dst_qn.starts_with("greeter/Greeter.java::"));
         assert!(edges[0].dst_qn.contains("greet"));
     }
 

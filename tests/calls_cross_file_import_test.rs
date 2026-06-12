@@ -125,3 +125,89 @@ fn javascript_pipeline_resolves_imported_class_method_via_lsp_cross() {
 
     let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
 }
+
+#[test]
+fn java_pipeline_resolves_imported_class_method_via_lsp_cross() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("greeter")).unwrap();
+    std::fs::write(
+        dir.path().join("Main.java"),
+        "import greeter.Greeter;\n\nclass Main {\n  void main() {\n    new Greeter().greet();\n  }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("greeter/Greeter.java"),
+        "package greeter;\n\nclass Greeter {\n  void greet() { }\n}\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(dir.path().join("decoy")).unwrap();
+    std::fs::write(
+        dir.path().join("decoy/Greeter.java"),
+        "package decoy;\n\nclass Greeter {\n  void greet() { }\n}\n",
+    )
+    .unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("java-lsp-cross")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("Main.java::Function::main@"))
+        .collect();
+    assert!(
+        main_calls
+            .iter()
+            .any(|e| e.dst_qn.contains("greet") && e.dst_qn.starts_with("greeter/Greeter.java::")),
+        "expected CALLS to greeter.Greeter.greet, got {main_calls:?}"
+    );
+    assert!(
+        !main_calls
+            .iter()
+            .any(|e| e.dst_qn.starts_with("decoy/Greeter.java::")),
+        "should not resolve to decoy Greeter: {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
+fn java_pipeline_skips_ambiguous_cross_file_greeter_without_import() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("greeter")).unwrap();
+    std::fs::create_dir_all(dir.path().join("decoy")).unwrap();
+    std::fs::write(
+        dir.path().join("Main.java"),
+        "class Main {\n  void main() {\n    new Greeter().greet();\n  }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("greeter/Greeter.java"),
+        "package greeter;\n\nclass Greeter {\n  void greet() { }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("decoy/Greeter.java"),
+        "package decoy;\n\nclass Greeter {\n  void greet() { }\n}\n",
+    )
+    .unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("java-ambiguous-lsp")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("Main.java::Function::main@"))
+        .collect();
+    assert!(
+        main_calls.iter().all(|e| {
+            !e.dst_qn.contains("greeter/Greeter.java::") && !e.dst_qn.contains("decoy/Greeter.java::")
+        }),
+        "unimported ambiguous Greeter should not lsp_cross link: {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}

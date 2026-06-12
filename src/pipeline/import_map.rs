@@ -26,6 +26,7 @@ impl ImportMap {
                 parse_js_imports(file_path, &caller_dir, content, &mut map)
             }
             "go" => parse_go_imports(content, &mut map),
+            "java" => parse_java_imports(content, &mut map),
             _ => {}
         }
         map
@@ -196,6 +197,40 @@ fn resolve_js_module(file_path: &str, caller_dir: &str, from: &str) -> String {
     format!("{from}.js")
 }
 
+fn parse_java_imports(content: &str, map: &mut ImportMap) {
+    let import_re =
+        Regex::new(r"(?m)^\s*import\s+(?:static\s+)?([\w.]+)\s*;").unwrap();
+    for cap in import_re.captures_iter(content) {
+        let path = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        if path.is_empty() {
+            continue;
+        }
+        if path.ends_with(".*") {
+            let pkg = path.trim_end_matches(".*");
+            map.modules.push(java_package_glob(pkg));
+            continue;
+        }
+        let class_name = path.rsplit('.').next().unwrap_or(path);
+        let target = java_import_to_file(path);
+        map.bindings.insert(class_name.to_string(), target.clone());
+        map.modules.push(target);
+    }
+}
+
+fn java_import_to_file(import_path: &str) -> String {
+    let parts: Vec<&str> = import_path.split('.').collect();
+    if parts.len() < 2 {
+        return format!("{import_path}.java");
+    }
+    let class_name = parts.last().copied().unwrap_or(import_path);
+    let pkg = parts[..parts.len() - 1].join("/");
+    format!("{pkg}/{class_name}.java")
+}
+
+fn java_package_glob(package: &str) -> String {
+    format!("{}/", package.replace('.', "/"))
+}
+
 fn parse_go_imports(content: &str, map: &mut ImportMap) {
     let import_block = Regex::new(r#"import\s+(?:\(([^)]*)\)|"([^"]+)")"#).unwrap();
     for cap in import_block.captures_iter(content) {
@@ -242,6 +277,10 @@ fn path_matches_module(candidate_file: &str, module_path: &str) -> bool {
             .is_some_and(|stem| m.starts_with(stem))
         || c.strip_suffix(".ts")
             .is_some_and(|stem| m.starts_with(stem))
+        || c.strip_suffix(".java")
+            .is_some_and(|stem| m.starts_with(stem))
+        || m.strip_suffix('/')
+            .is_some_and(|pkg| c.starts_with(pkg))
 }
 
 #[cfg(test)]
@@ -255,6 +294,16 @@ mod tests {
         assert_eq!(
             map.bindings.get("helper").map(String::as_str),
             Some("utils.py")
+        );
+    }
+
+    #[test]
+    fn java_import_binds_class_to_package_path() {
+        let src = "import greeter.Greeter;\n\nclass Main {\n  void main() {}\n}\n";
+        let map = ImportMap::parse("Main.java", "java", src);
+        assert_eq!(
+            map.bindings.get("Greeter").map(String::as_str),
+            Some("greeter/Greeter.java")
         );
     }
 

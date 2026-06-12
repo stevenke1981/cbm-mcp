@@ -115,7 +115,7 @@ Reference passes (37 files) mapped to Rust:
 | Definitions / extract | `pass_definitions.c` | `pipeline/extract.rs` | Partial | 7 langs; no registry |
 | Imports | `extract_imports.c` | `pipeline/imports.rs` | Partial | Regex heuristic |
 | Calls | `pass_calls.c`, `extract_calls.c` | `pipeline/calls.rs`, `calls_ast.rs`, `registry.rs`, `import_map.rs` | Partial | AST + import map; LSP subprocess pending |
-| LSP cross-file | `pass_lsp_cross.c` | `pipeline/lsp_cross.rs` | **Partial** | Python/JS/TS/Go imported-type methods; Java pending |
+| LSP cross-file | `pass_lsp_cross.c` | `pipeline/lsp_cross.rs` | **Partial** | Python/JS/TS/Go/Java imported-type methods; C/PHP pending |
 | Usages / TypeRef | `pass_usages.c`, `extract_usages.c` | — | **Missing** | `TYPE_REF` edges |
 | Inherits / Implements | (semantic + extract) | `pipeline/inheritance.rs` | Partial | Regex |
 | Decorates | `extract_semantic.c` patterns | `pipeline/inheritance.rs` | Partial | |
