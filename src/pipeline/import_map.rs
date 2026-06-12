@@ -401,7 +401,7 @@ fn load_composer_psr4(file_path: &str, repo_root: Option<&Path>) -> Vec<(String,
         if composer.is_file() {
             if let Ok(raw) = std::fs::read_to_string(&composer) {
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
-                    return parse_composer_psr4(&v, &dir);
+                    return parse_composer_psr4(&v, &dir, repo_root);
                 }
             }
             break;
@@ -413,7 +413,11 @@ fn load_composer_psr4(file_path: &str, repo_root: Option<&Path>) -> Vec<(String,
     Vec::new()
 }
 
-fn parse_composer_psr4(root: &serde_json::Value, composer_dir: &Path) -> Vec<(String, String)> {
+fn parse_composer_psr4(
+    root: &serde_json::Value,
+    composer_dir: &Path,
+    repo_root: Option<&Path>,
+) -> Vec<(String, String)> {
     let Some(psr4) = root
         .pointer("/autoload/psr-4")
         .or_else(|| root.pointer("/autoload-dev/psr-4"))
@@ -431,7 +435,11 @@ fn parse_composer_psr4(root: &serde_json::Value, composer_dir: &Path) -> Vec<(St
         if !norm_prefix.ends_with('\\') {
             norm_prefix.push('\\');
         }
-        let base = normalize_path(&composer_dir.join(dir).to_string_lossy());
+        let joined = composer_dir.join(dir);
+        let base_path = repo_root
+            .and_then(|root| joined.strip_prefix(root).ok())
+            .unwrap_or(joined.as_path());
+        let base = normalize_path(&base_path.to_string_lossy());
         entries.push((norm_prefix, base));
     }
     entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
@@ -577,6 +585,22 @@ mod tests {
         assert_eq!(
             php_use_to_file("App\\Service\\Helper", &psr4),
             "src/Service/Helper.php"
+        );
+    }
+
+    #[test]
+    fn php_psr4_with_repo_root_uses_repo_relative_path() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            dir.path().join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+        let src = "<?php\nuse App\\Service\\Helper;\n";
+        let map = ImportMap::parse_with_root("main.php", "php", src, Some(dir.path()));
+        assert_eq!(
+            map.bindings.get("Helper").map(String::as_str),
+            Some("src/Service/Helper.php")
         );
     }
 
