@@ -1,43 +1,57 @@
+use crate::pipeline::import_map::ImportMap;
+use crate::pipeline::registry::{FileCallResolver, SymbolRegistry};
 use crate::store::{Edge, Symbol};
-use std::collections::HashMap;
 
-pub fn build_name_registry(symbols: &[Symbol]) -> HashMap<String, Vec<String>> {
-    let mut name_to_qn: HashMap<String, Vec<String>> = HashMap::new();
-    for sym in symbols {
-        name_to_qn
-            .entry(sym.name.clone())
-            .or_default()
-            .push(sym.qualified_name.clone());
-    }
-    name_to_qn
+pub use crate::pipeline::registry::SymbolRegistry as Registry;
+
+/// Build a project-wide symbol registry (replaces legacy `HashMap` helper).
+pub fn build_symbol_registry(symbols: &[Symbol]) -> SymbolRegistry {
+    SymbolRegistry::from_symbols(symbols)
 }
 
-/// Resolve CALLS edges using a project-wide symbol registry (cross-file).
+/// Legacy alias — returns the registry (older tests used a plain `HashMap`).
+pub fn build_name_registry(symbols: &[Symbol]) -> SymbolRegistry {
+    build_symbol_registry(symbols)
+}
+
+/// Resolve CALLS edges using registry + per-file import map.
 pub fn resolve_calls_with_registry(
     symbols: &[Symbol],
     content: &str,
     language: &str,
-    registry: &HashMap<String, Vec<String>>,
+    registry: &SymbolRegistry,
+    caller_file: &str,
 ) -> Vec<Edge> {
-    if language == "rust" {
-        let ast_edges = super::calls_ast::resolve_calls_rust_ast(symbols, content, registry);
+    let imports = ImportMap::parse(caller_file, language, content);
+    let mut resolver = FileCallResolver::new(registry, caller_file, imports);
+
+    if matches!(
+        language,
+        "rust" | "python" | "javascript" | "jsx" | "typescript" | "tsx" | "go" | "java"
+    ) {
+        let ast_edges = super::calls_ast::resolve_calls_ast(language, symbols, content, &mut resolver);
         if !ast_edges.is_empty() {
             return ast_edges;
         }
     }
-    resolve_calls_inner(symbols, content, registry)
+    resolve_calls_regex(symbols, content, language, &mut resolver)
 }
 
-/// Resolve CALLS edges from symbol definitions using name matching within file scope.
-pub fn resolve_calls(symbols: &[Symbol], content: &str, _language: &str) -> Vec<Edge> {
-    let registry = build_name_registry(symbols);
-    resolve_calls_inner(symbols, content, &registry)
+/// Resolve CALLS edges from symbol definitions (single-file registry).
+pub fn resolve_calls(symbols: &[Symbol], content: &str, language: &str) -> Vec<Edge> {
+    let file = symbols
+        .first()
+        .map(|s| s.file_path.as_str())
+        .unwrap_or("unknown");
+    let registry = build_symbol_registry(symbols);
+    resolve_calls_with_registry(symbols, content, language, &registry, file)
 }
 
-fn resolve_calls_inner(
+fn resolve_calls_regex(
     symbols: &[Symbol],
     content: &str,
-    name_to_qn: &HashMap<String, Vec<String>>,
+    _language: &str,
+    resolver: &mut FileCallResolver<'_>,
 ) -> Vec<Edge> {
     let call_patterns = [
         regex::Regex::new(r"\b(\w+)\s*\(").unwrap(),
@@ -62,40 +76,23 @@ fn resolve_calls_inner(
             for cap in re.captures_iter(&body) {
                 if let Some(name_match) = cap.get(1) {
                     let callee_name = name_match.as_str();
-                    if callee_name == sym.name
-                        || matches!(
-                            callee_name,
-                            "if" | "for"
-                                | "while"
-                                | "match"
-                                | "return"
-                                | "let"
-                                | "const"
-                                | "var"
-                                | "new"
-                                | "self"
-                                | "super"
-                                | "print"
-                                | "println"
-                                | "format"
-                        )
-                    {
+                    if callee_name == sym.name || is_regex_noise(callee_name) {
                         continue;
                     }
-                    let targets = pick_callees(callee_name, &sym.file_path, name_to_qn);
-                    for dst in targets {
-                        if dst == sym.qualified_name {
+                    if let Some(res) = resolver.resolve(callee_name) {
+                        if res.qn == sym.qualified_name {
                             continue;
                         }
-                        let key = (sym.qualified_name.clone(), dst.clone());
+                        let key = (sym.qualified_name.clone(), res.qn.clone());
                         if seen.insert(key.clone()) {
                             edges.push(Edge {
                                 src_qn: key.0,
                                 dst_qn: key.1,
                                 edge_type: "CALLS".into(),
-                                properties_json: Some(
-                                    r#"{"confidence":"resolved","method":"regex"}"#.into(),
-                                ),
+                                properties_json: Some(format!(
+                                    r#"{{"confidence":"{}","method":"regex","strategy":"{}","score":{:.2}}}"#,
+                                    res.band, res.strategy, res.confidence
+                                )),
                             });
                         }
                     }
@@ -106,36 +103,32 @@ fn resolve_calls_inner(
     edges
 }
 
-/// Same-file matches first; cross-file only when the name is globally unique.
-pub(crate) fn pick_callees(
-    callee_name: &str,
-    caller_file: &str,
-    registry: &HashMap<String, Vec<String>>,
-) -> Vec<String> {
-    let Some(qns) = registry.get(callee_name) else {
-        return Vec::new();
-    };
-
-    let same_file: Vec<String> = qns
-        .iter()
-        .filter(|qn| qn.starts_with(&format!("{caller_file}::")))
-        .cloned()
-        .collect();
-    if !same_file.is_empty() {
-        return same_file;
-    }
-    if qns.len() == 1 {
-        return qns.clone();
-    }
-    Vec::new()
+fn is_regex_noise(name: &str) -> bool {
+    matches!(
+        name,
+        "if" | "for"
+            | "while"
+            | "match"
+            | "return"
+            | "let"
+            | "const"
+            | "var"
+            | "new"
+            | "self"
+            | "super"
+            | "print"
+            | "println"
+            | "format"
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::symbol_id::qualified_name;
 
     fn qn(file: &str, label: &str, name: &str, line: i64) -> String {
-        crate::symbol_id::qualified_name(file, label, name, line)
+        qualified_name(file, label, name, line)
     }
 
     #[test]
@@ -204,11 +197,59 @@ mod tests {
             },
         ];
         let src = "fn main() { helper(); }\n";
-        let registry = build_name_registry(&symbols);
-        let edges = resolve_calls_with_registry(&symbols[..1], src, "rust", &registry);
+        let registry = build_symbol_registry(&symbols);
+        let edges = resolve_calls_with_registry(&symbols[..1], src, "rust", &registry, "a.rs");
         assert!(
             edges.is_empty(),
             "ambiguous cross-file callee should not link"
+        );
+    }
+
+    #[test]
+    fn resolves_cross_file_via_python_import() {
+        let symbols = vec![
+            Symbol {
+                qualified_name: qn("main.py", "Function", "main", 4),
+                name: "main".into(),
+                label: "Function".into(),
+                file_path: "main.py".into(),
+                line_start: 4,
+                line_end: 6,
+                signature: None,
+                properties_json: None,
+            },
+            Symbol {
+                qualified_name: qn("utils.py", "Function", "helper", 1),
+                name: "helper".into(),
+                label: "Function".into(),
+                file_path: "utils.py".into(),
+                line_start: 1,
+                line_end: 2,
+                signature: None,
+                properties_json: None,
+            },
+            Symbol {
+                qualified_name: qn("decoy.py", "Function", "helper", 1),
+                name: "helper".into(),
+                label: "Function".into(),
+                file_path: "decoy.py".into(),
+                line_start: 1,
+                line_end: 2,
+                signature: None,
+                properties_json: None,
+            },
+        ];
+        let src = "from utils import helper\n\ndef main():\n    helper()\n";
+        let registry = build_symbol_registry(&symbols);
+        let edges =
+            resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "main.py");
+        assert_eq!(edges.len(), 1);
+        assert!(edges[0].dst_qn.starts_with("utils.py::"));
+        assert!(
+            edges[0]
+                .properties_json
+                .as_ref()
+                .is_some_and(|p| p.contains("import_binding") || p.contains("ast"))
         );
     }
 }

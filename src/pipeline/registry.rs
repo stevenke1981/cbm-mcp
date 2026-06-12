@@ -1,0 +1,299 @@
+use crate::pipeline::import_map::ImportMap;
+use crate::store::Symbol;
+use std::collections::HashMap;
+
+const MAX_CANDIDATES: usize = 256;
+const CONF_IMPORT_BINDING: f64 = 0.95;
+const CONF_SAME_FILE: f64 = 0.90;
+const CONF_UNIQUE_NAME: f64 = 0.75;
+const CONF_IMPORT_FILTERED: f64 = 0.55;
+const CONF_IMPORT_FILTERED_PENALTY: f64 = 0.30;
+
+/// Resolution result aligned with reference `cbm_resolution_t`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallResolution {
+    pub qn: String,
+    pub strategy: String,
+    pub confidence: f64,
+    pub band: String,
+}
+
+/// Project-wide symbol registry for call resolution (reference `cbm_registry_t`).
+#[derive(Debug, Default)]
+pub struct SymbolRegistry {
+    exact: HashMap<String, String>,
+    by_name: HashMap<String, Vec<String>>,
+}
+
+impl SymbolRegistry {
+    pub fn from_symbols(symbols: &[Symbol]) -> Self {
+        let mut reg = Self::default();
+        for sym in symbols {
+            reg.add(sym);
+        }
+        reg
+    }
+
+    pub fn add(&mut self, sym: &Symbol) {
+        if self.exact.contains_key(&sym.qualified_name) {
+            return;
+        }
+        self.exact
+            .insert(sym.qualified_name.clone(), sym.label.clone());
+        let simple = simple_name(&sym.qualified_name);
+        self.by_name
+            .entry(simple)
+            .or_default()
+            .push(sym.qualified_name.clone());
+    }
+
+    pub fn candidates(&self, callee_name: &str) -> &[String] {
+        static EMPTY: Vec<String> = Vec::new();
+        let lookup = simple_name(callee_name);
+        self.by_name.get(&lookup).map(Vec::as_slice).unwrap_or(&EMPTY)
+    }
+
+    pub fn resolve(&self, callee_name: &str, caller_file: &str, imports: &ImportMap) -> Option<CallResolution> {
+        if callee_name.is_empty() {
+            return None;
+        }
+
+        let candidates = self.candidates(callee_name);
+        if candidates.len() > MAX_CANDIDATES {
+            return None;
+        }
+
+        // Strategy 1: direct import binding → symbol in target module.
+        if let Some(target) = imports.bindings.get(callee_name) {
+            let scoped: Vec<String> = candidates
+                .iter()
+                .filter(|qn| qn_belongs_to_module(qn, target))
+                .cloned()
+                .collect();
+            if scoped.len() == 1 {
+                return Some(resolution(
+                    &scoped[0],
+                    "import_binding",
+                    CONF_IMPORT_BINDING,
+                ));
+            }
+        }
+
+        // Strategy 2: same-file match.
+        let same_file: Vec<String> = candidates
+            .iter()
+            .filter(|qn| qn.starts_with(&format!("{caller_file}::")))
+            .cloned()
+            .collect();
+        if same_file.len() == 1 {
+            return Some(resolution(&same_file[0], "same_file", CONF_SAME_FILE));
+        }
+        if same_file.len() > 1 {
+            return None;
+        }
+
+        // Strategy 3: globally unique name.
+        if candidates.len() == 1 {
+            let conf = if imports.is_reachable(qn_file(&candidates[0])) {
+                CONF_UNIQUE_NAME
+            } else if imports.bindings.is_empty() && imports.modules.is_empty() {
+                CONF_UNIQUE_NAME
+            } else {
+                CONF_UNIQUE_NAME * 0.5
+            };
+            return Some(resolution(&candidates[0], "unique_name", conf));
+        }
+
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // Strategy 4: import-filtered suffix match among multiple candidates.
+        if !imports.bindings.is_empty() || !imports.modules.is_empty() {
+            let reachable: Vec<String> = candidates
+                .iter()
+                .filter(|qn| imports.is_reachable(qn_file(qn)))
+                .cloned()
+                .collect();
+            if reachable.len() == 1 {
+                return Some(resolution(
+                    &reachable[0],
+                    "import_filtered",
+                    CONF_IMPORT_FILTERED,
+                ));
+            }
+            if reachable.len() > 1 {
+                if let Some(best) = best_candidate(&reachable, caller_file) {
+                    return Some(resolution(
+                        best,
+                        "import_filtered",
+                        CONF_IMPORT_FILTERED_PENALTY,
+                    ));
+                }
+                return None;
+            }
+            return None;
+        }
+
+        None
+    }
+}
+
+pub fn confidence_band(score: f64) -> &'static str {
+    if score >= 0.7 {
+        "high"
+    } else if score >= 0.45 {
+        "medium"
+    } else if score >= 0.25 {
+        "speculative"
+    } else {
+        "low"
+    }
+}
+
+fn resolution(qn: &str, strategy: &str, confidence: f64) -> CallResolution {
+    CallResolution {
+        qn: qn.to_string(),
+        strategy: strategy.to_string(),
+        confidence,
+        band: confidence_band(confidence).to_string(),
+    }
+}
+
+fn simple_name(qn: &str) -> String {
+    qn.rsplit("::")
+        .next()
+        .and_then(|s| s.split('@').next())
+        .unwrap_or(qn)
+        .to_string()
+}
+
+fn qn_file(qn: &str) -> &str {
+    qn.split("::").next().unwrap_or(qn)
+}
+
+fn qn_belongs_to_module(qn: &str, module_path: &str) -> bool {
+    let file = qn_file(qn);
+    let norm_file = file.replace('\\', "/");
+    let norm_mod = module_path.replace('\\', "/");
+    norm_file == norm_mod
+        || norm_file.ends_with(&norm_mod)
+        || norm_mod.ends_with(&norm_file)
+        || norm_file.strip_suffix(".py").is_some_and(|s| norm_mod.starts_with(s))
+        || norm_mod.strip_suffix(".py").is_some_and(|s| norm_file.starts_with(s))
+}
+
+fn best_candidate<'a>(candidates: &'a [String], caller_file: &str) -> Option<&'a str> {
+    candidates
+        .iter()
+        .max_by_key(|qn| candidate_score(qn, caller_file))
+        .map(String::as_str)
+}
+
+fn candidate_score(qn: &str, caller_file: &str) -> i32 {
+    let mut score = 0i32;
+    let file = qn_file(qn);
+    if !file.contains("test") && !file.contains("mock") && !file.contains("spec") {
+        score += 1000;
+    }
+    let caller_stem = caller_file
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(caller_file)
+        .split('.')
+        .next()
+        .unwrap_or(caller_file);
+    if file.contains(caller_stem) {
+        score += 10;
+    }
+    score
+}
+
+/// Per-file resolver with memoization (reference per-file resolve cache).
+#[derive(Debug)]
+pub struct FileCallResolver<'a> {
+    registry: &'a SymbolRegistry,
+    caller_file: String,
+    imports: ImportMap,
+    cache: HashMap<String, Option<CallResolution>>,
+}
+
+impl<'a> FileCallResolver<'a> {
+    pub fn new(registry: &'a SymbolRegistry, caller_file: &str, imports: ImportMap) -> Self {
+        Self {
+            registry,
+            caller_file: caller_file.to_string(),
+            imports,
+            cache: HashMap::new(),
+        }
+    }
+
+    pub fn resolve(&mut self, callee_name: &str) -> Option<CallResolution> {
+        if let Some(hit) = self.cache.get(callee_name) {
+            return hit.clone();
+        }
+        let res = self
+            .registry
+            .resolve(callee_name, &self.caller_file, &self.imports);
+        self.cache.insert(callee_name.to_string(), res.clone());
+        res
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::symbol_id::qualified_name;
+
+    fn sym(file: &str, name: &str, line: i64) -> Symbol {
+        Symbol {
+            qualified_name: qualified_name(file, "Function", name, line),
+            name: name.into(),
+            label: "Function".into(),
+            file_path: file.into(),
+            line_start: line,
+            line_end: line + 2,
+            signature: None,
+            properties_json: None,
+        }
+    }
+
+    #[test]
+    fn resolves_same_file_helper() {
+        let reg = SymbolRegistry::from_symbols(&[
+            sym("main.py", "main", 4),
+            sym("main.py", "helper", 1),
+        ]);
+        let imports = ImportMap::default();
+        let res = reg.resolve("helper", "main.py", &imports).unwrap();
+        assert_eq!(res.strategy, "same_file");
+        assert!(res.qn.contains("helper"));
+    }
+
+    #[test]
+    fn resolves_import_bound_cross_file_helper() {
+        let reg = SymbolRegistry::from_symbols(&[
+            sym("main.py", "main", 4),
+            sym("utils.py", "helper", 1),
+            sym("decoy.py", "helper", 1),
+        ]);
+        let mut imports = ImportMap::default();
+        imports
+            .bindings
+            .insert("helper".into(), "utils.py".into());
+        let res = reg.resolve("helper", "main.py", &imports).unwrap();
+        assert_eq!(res.strategy, "import_binding");
+        assert!(res.qn.starts_with("utils.py::"));
+    }
+
+    #[test]
+    fn skips_ambiguous_cross_file_without_import() {
+        let reg = SymbolRegistry::from_symbols(&[
+            sym("main.rs", "main", 1),
+            sym("a.rs", "helper", 1),
+            sym("b.rs", "helper", 1),
+        ]);
+        let imports = ImportMap::default();
+        assert!(reg.resolve("helper", "main.rs", &imports).is_none());
+    }
+}

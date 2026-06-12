@@ -47,8 +47,8 @@ fn python_pipeline_resolves_local_call() {
     assert!(
         edge.properties_json
             .as_ref()
-            .is_some_and(|p| p.contains("regex")),
-        "expected regex method metadata"
+            .is_some_and(|p| p.contains("regex") || p.contains("ast")),
+        "expected call resolution metadata"
     );
 
     let _ = codebase_memory_mcp::store::delete_project_db(&index.project);

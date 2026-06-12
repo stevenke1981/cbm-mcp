@@ -14,7 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** hybrid CALLS/LSP · graph buffer staging · wire `target_projects` · `manage_adr_sections` decision.
+**Next P0 slices:** LSP subprocess cross-file · graph buffer staging · wire `target_projects` · `manage_adr_sections` decision.
+
+**In progress:** `SymbolRegistry` + import-map CALLS (`registry.rs`, `import_map.rs`) — AST for Rust/Python/JS/Go/Java; import-aware cross-file resolution.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -163,17 +165,17 @@ Acceptance criteria:
 
 ## P0 - CALLS precision and LSP cross-file resolution
 
-- [ ] Implement hybrid CALLS resolution:
-  - Rust AST pass
-  - Python
-  - TypeScript/JavaScript
-  - Go
-  - Java
-  - C/C++
-  - C#
-  - PHP
+- [~] Implement hybrid CALLS resolution:
+  - [x] Rust AST pass
+  - [x] Python AST pass
+  - [x] TypeScript/JavaScript AST pass
+  - [x] Go AST pass
+  - [x] Java AST pass
+  - [ ] C/C++
+  - [ ] C#
+  - [ ] PHP
 - [ ] Add LSP-assisted cross-file resolution where the reference uses it.
-- [ ] Add alias/import-aware call resolution.
+- [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).
 - [ ] Add method vs free-function disambiguation.
 - [ ] Add class/impl/trait/interface method resolution.
 - [ ] Add negative fixtures:

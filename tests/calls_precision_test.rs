@@ -21,8 +21,13 @@ fn assert_resolves(language: &str, src: &str, symbols: &[Symbol], caller: &str, 
         .find(|s| s.name == caller)
         .expect("caller symbol");
     let registry = build_name_registry(symbols);
-    let edges =
-        resolve_calls_with_registry(std::slice::from_ref(caller_sym), src, language, &registry);
+    let edges = resolve_calls_with_registry(
+        std::slice::from_ref(caller_sym),
+        src,
+        language,
+        &registry,
+        &caller_sym.file_path,
+    );
     assert!(
         edges
             .iter()
@@ -80,7 +85,7 @@ fn ambiguous_cross_file_call_stays_empty() {
     ];
     let src = "fn main() { spawn(); }\n";
     let registry = build_name_registry(&symbols);
-    let edges = resolve_calls_with_registry(&symbols[..1], src, "rust", &registry);
+    let edges = resolve_calls_with_registry(&symbols[..1], src, "rust", &registry, "a.rs");
     assert!(edges.is_empty());
 }
 
@@ -92,13 +97,13 @@ fn regex_fallback_marks_method_metadata() {
     ];
     let src = "def main():\n    helper()\n\ndef helper():\n    pass\n";
     let registry = build_name_registry(&symbols);
-    let edges = resolve_calls_with_registry(&symbols[..1], src, "python", &registry);
+    let edges = resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "a.py");
     assert_eq!(edges.len(), 1);
     assert!(
         edges[0]
             .properties_json
             .as_ref()
-            .is_some_and(|p| p.contains("regex")),
-        "expected regex method metadata"
+            .is_some_and(|p| p.contains("regex") || p.contains("ast")),
+        "expected call resolution metadata"
     );
 }

@@ -114,7 +114,7 @@ Reference passes (37 files) mapped to Rust:
 | Structure | `pass_definitions.c` (structure nodes) | `pipeline/structure.rs` | Done | Package-level nodes |
 | Definitions / extract | `pass_definitions.c` | `pipeline/extract.rs` | Partial | 7 langs; no registry |
 | Imports | `extract_imports.c` | `pipeline/imports.rs` | Partial | Regex heuristic |
-| Calls | `pass_calls.c`, `extract_calls.c` | `pipeline/calls.rs`, `calls_ast.rs` | Partial | No LSP cross-file |
+| Calls | `pass_calls.c`, `extract_calls.c` | `pipeline/calls.rs`, `calls_ast.rs`, `registry.rs`, `import_map.rs` | Partial | AST + import map; LSP subprocess pending |
 | LSP cross-file | `pass_lsp_cross.c` | — | **Missing** | `*_lsp.c` in internal |
 | Usages / TypeRef | `pass_usages.c`, `extract_usages.c` | — | **Missing** | `TYPE_REF` edges |
 | Inherits / Implements | (semantic + extract) | `pipeline/inheritance.rs` | Partial | Regex |
@@ -134,7 +134,7 @@ Reference passes (37 files) mapped to Rust:
 | Compile commands | `pass_compile_commands.c` | — | **Missing** | C/C++ LSP aid |
 | Parallel workers | `pass_parallel.c`, `worker_pool.c` | `rayon` in pipeline | Partial | |
 | Incremental | `pipeline_incremental.c` | `pipeline/mod.rs` `run_incremental` | Partial | File-hash invalidation |
-| Registry | `registry.c` | — | **Missing** | Call resolution backbone |
+| Registry | `registry.c` | `pipeline/registry.rs` | **Partial** | Import-aware resolve; no LSP subprocess yet |
 | FQN / path alias | `fqn.c`, `path_alias.c` | `project.rs`, `symbol_id.rs` | Partial | Relative import resolve |
 | Artifact | `artifact.c` | `persistence/mod.rs` | Partial | Checksum/version gate |
 

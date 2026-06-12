@@ -12,7 +12,7 @@ Target: feature-equivalent Rust rewrite of `D:\_cbm-ref` (DeusData/codebase-memo
 ## P0 — graph correctness
 
 - [x] Reference module inventory (`docs/MODULE_MAP.md`, `docs/IMPLEMENTATION_CHECKLIST.md`)
-- [ ] Hybrid LSP CALLS (Python, TS/JS, PHP, C#, Go, C/C++) — see `registry.c`, `pass_lsp_cross.c` in map
+- [~] Hybrid CALLS: `SymbolRegistry` + import map + AST (Rust/Py/JS/Go/Java); LSP subprocess pending
 - [x] Store bulk transaction API + rollback tests
 - [~] Honest `get_graph_schema` vs emitted edges (implemented; expand as new edge types land)
 

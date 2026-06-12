@@ -2,12 +2,16 @@ mod calls;
 mod calls_ast;
 mod communities;
 mod extract;
+mod import_map;
 mod imports;
 mod inheritance;
+mod registry;
 mod routes;
 mod structure;
 
 pub use calls::*;
+pub use import_map::ImportMap;
+pub use registry::{CallResolution, FileCallResolver, SymbolRegistry};
 pub use communities::*;
 pub use extract::*;
 pub use imports::*;
@@ -473,7 +477,7 @@ fn finalize_index(
 }
 
 fn rebuild_call_edges(store: &Store, code_symbols: &[Symbol]) -> Result<Vec<Edge>> {
-    let registry = build_name_registry(code_symbols);
+    let registry = build_symbol_registry(code_symbols);
     let files = store.list_files()?;
     let symbols_by_file: HashMap<String, Vec<Symbol>> =
         code_symbols.iter().fold(HashMap::new(), |mut acc, sym| {
@@ -491,6 +495,7 @@ fn rebuild_call_edges(store: &Store, code_symbols: &[Symbol]) -> Result<Vec<Edge
                 &file.content,
                 &file.language,
                 &registry,
+                &file.path,
             ));
         }
     }
