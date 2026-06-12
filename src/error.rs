@@ -2,6 +2,12 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// JSON-RPC 2.0 standard error codes (aligned with reference `mcp.c`).
+pub const JSONRPC_PARSE_ERROR: i32 = -32700;
+pub const JSONRPC_METHOD_NOT_FOUND: i32 = -32601;
+pub const JSONRPC_INVALID_PARAMS: i32 = -32602;
+pub const JSONRPC_INTERNAL_ERROR: i32 = -32603;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("database error: {0}")]

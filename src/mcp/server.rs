@@ -1,4 +1,6 @@
-use crate::error::{Error, Result};
+use crate::error::{
+    Result, JSONRPC_INTERNAL_ERROR, JSONRPC_METHOD_NOT_FOUND, JSONRPC_PARSE_ERROR,
+};
 use crate::mcp::tool_specs::tool_definitions;
 use crate::mcp::tools::ToolHandler;
 use crate::mcp::transport::{read_stdin_message, write_stdout_message};
@@ -72,9 +74,25 @@ impl McpServer {
     }
 
     pub fn handle_message(&self, raw: &str) -> Result<Option<String>> {
-        let request: Value = serde_json::from_str(raw)?;
+        let request: Value = match serde_json::from_str(raw) {
+            Ok(v) => v,
+            Err(_) => {
+                return Ok(Some(format_error(
+                    Value::Null,
+                    JSONRPC_PARSE_ERROR,
+                    "Parse error",
+                )?));
+            }
+        };
+
         let id = request.get("id").cloned();
-        let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
+        let Some(method) = request.get("method").and_then(|m| m.as_str()) else {
+            return Ok(Some(format_error(
+                jsonrpc_error_id(id),
+                JSONRPC_PARSE_ERROR,
+                "Parse error",
+            )?));
+        };
 
         let result = match method {
             "initialize" => Ok(self.handle_initialize(&request)),
@@ -86,14 +104,22 @@ impl McpServer {
                 if id.is_none() {
                     return Ok(None);
                 }
-                Err(Error::InvalidArgument(format!("unknown method: {method}")))
+                return Ok(Some(format_error(
+                    id.unwrap(),
+                    JSONRPC_METHOD_NOT_FOUND,
+                    "Method not found",
+                )?));
             }
         };
 
         match (id, result) {
             (None, _) => Ok(None),
             (Some(id), Ok(value)) => Ok(Some(format_response(id, value)?)),
-            (Some(id), Err(e)) => Ok(Some(format_error(id, -32603, &e.to_string())?)),
+            (Some(id), Err(e)) => Ok(Some(format_error(
+                id,
+                JSONRPC_INTERNAL_ERROR,
+                &e.to_string(),
+            )?)),
         }
     }
 
@@ -116,23 +142,45 @@ impl McpServer {
     }
 
     fn handle_tool_call(&self, request: &Value) -> Result<Value> {
-        let params = request
-            .get("params")
-            .ok_or_else(|| Error::InvalidArgument("missing params".into()))?;
+        let params = request.get("params");
         let name = params
-            .get("name")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| Error::InvalidArgument("missing tool name".into()))?;
-        let args = params.get("arguments").cloned().unwrap_or(json!({}));
-        let result = self.handler.handle(name, &args)?;
-        Ok(json!({
-            "content": [{
-                "type": "text",
-                "text": serde_json::to_string_pretty(&result)?
-            }],
-            "isError": false
-        }))
+            .and_then(|p| p.get("name"))
+            .and_then(|v| v.as_str());
+        let Some(name) = name else {
+            return Ok(tool_text_result("missing tool name", true));
+        };
+        let args = params
+            .and_then(|p| p.get("arguments"))
+            .cloned()
+            .unwrap_or(json!({}));
+        match self.handler.handle(name, &args) {
+            Ok(result) => Ok(json!({
+                "content": [{
+                    "type": "text",
+                    "text": serde_json::to_string_pretty(&result)?
+                }],
+                "isError": false
+            })),
+            Err(e) => Ok(tool_text_result(&e.to_string(), true)),
+        }
     }
+}
+
+fn jsonrpc_error_id(id: Option<Value>) -> Value {
+    id.unwrap_or(Value::from(0))
+}
+
+fn tool_text_result(text: &str, is_error: bool) -> Value {
+    let mut result = json!({
+        "content": [{
+            "type": "text",
+            "text": text
+        }]
+    });
+    if is_error {
+        result["isError"] = json!(true);
+    }
+    result
 }
 
 fn watcher_enabled() -> bool {
@@ -195,5 +243,109 @@ mod tests {
         let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
         assert!(resp.contains("index_repository"));
         assert!(!resp.contains("rlm_workflow"));
+    }
+
+    #[test]
+    fn parse_error_on_invalid_json() {
+        std::env::set_var("CBM_WATCHER", "0");
+        let server = McpServer::new();
+        let resp = server
+            .handle_message("not json")
+            .unwrap()
+            .expect("parse error response");
+        let value: Value = serde_json::from_str(&resp).unwrap();
+        assert_eq!(value.get("id"), Some(&Value::Null));
+        assert_eq!(
+            value.pointer("/error/code").and_then(|v| v.as_i64()),
+            Some(-32700)
+        );
+    }
+
+    #[test]
+    fn method_not_found_returns_32601() {
+        std::env::set_var("CBM_WATCHER", "0");
+        let server = McpServer::new();
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "unknown/method"
+        });
+        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
+        let value: Value = serde_json::from_str(&resp).unwrap();
+        assert_eq!(value.get("id"), Some(&Value::from(3)));
+        assert_eq!(
+            value.pointer("/error/code").and_then(|v| v.as_i64()),
+            Some(-32601)
+        );
+        assert_eq!(
+            value.pointer("/error/message").and_then(|v| v.as_str()),
+            Some("Method not found")
+        );
+    }
+
+    #[test]
+    fn tools_call_unknown_tool_returns_is_error() {
+        std::env::set_var("CBM_WATCHER", "0");
+        let server = McpServer::new();
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/call",
+            "params": {
+                "name": "nonexistent_tool",
+                "arguments": {}
+            }
+        });
+        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
+        let value: Value = serde_json::from_str(&resp).unwrap();
+        assert_eq!(value.get("id"), Some(&Value::from(12)));
+        assert_eq!(
+            value.pointer("/result/isError").and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert!(
+            value
+                .pointer("/result/content/0/text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .contains("unknown tool")
+        );
+    }
+
+    #[test]
+    fn tools_call_missing_name_returns_is_error() {
+        std::env::set_var("CBM_WATCHER", "0");
+        let server = McpServer::new();
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 50,
+            "method": "tools/call",
+            "params": { "arguments": {} }
+        });
+        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
+        let value: Value = serde_json::from_str(&resp).unwrap();
+        assert_eq!(
+            value.pointer("/result/isError").and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            value.pointer("/result/content/0/text").and_then(|v| v.as_str()),
+            Some("missing tool name")
+        );
+    }
+
+    #[test]
+    fn string_id_preserved_in_response() {
+        std::env::set_var("CBM_WATCHER", "0");
+        let server = McpServer::new();
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": "init-abc",
+            "method": "initialize",
+            "params": {}
+        });
+        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
+        let value: Value = serde_json::from_str(&resp).unwrap();
+        assert_eq!(value.get("id"), Some(&Value::from("init-abc")));
     }
 }

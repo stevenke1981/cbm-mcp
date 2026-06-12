@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** MCP JSON-RPC parity · incremental index · artifact export/restore.
+**Next P0 slices:** incremental index · artifact export/restore · MCP tool schema lock per tool.
 
-**Done recently:** CALLS negative fixtures (alias/ambiguous/overload-like/framework noise) · PHP require/autoload · CALLS confidence metadata · C# CALLS AST · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST.
+**Done recently:** MCP JSON-RPC error codes (-32700/-32601) + tool `isError` results · CALLS negative fixtures · PHP require/autoload · CALLS confidence metadata · C# CALLS AST.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -57,12 +57,12 @@ Acceptance criteria:
 ## P0 - MCP protocol and tool contract parity
 
 - [ ] Keep MCP server name as `codebase-memory-mcp`.
-- [ ] Verify JSON-RPC 2.0 framing:
-  - `initialize`
-  - `tools/list`
-  - `tools/call`
-  - error objects
-  - cancellation/shutdown behavior where supported
+- [~] Verify JSON-RPC 2.0 framing:
+  - [x] `initialize`
+  - [x] `tools/list`
+  - [x] `tools/call`
+  - [x] error objects (`-32700` parse, `-32601` method not found, tool `isError`)
+  - [ ] cancellation/shutdown behavior where supported
 - [ ] Match the reference tool set for graph CBM:
   - `index_repository`
   - `index_status`

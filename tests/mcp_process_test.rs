@@ -22,6 +22,13 @@ fn expected_tool_names_from_specs() -> BTreeSet<String> {
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
             continue;
         }
+        if path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .is_some_and(|s| s.starts_with("rlm_"))
+        {
+            continue;
+        }
         let raw = fs::read_to_string(&path).unwrap();
         let value: Value = serde_json::from_str(&raw).unwrap();
         names.insert(
