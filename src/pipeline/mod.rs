@@ -2,6 +2,7 @@ mod calls;
 mod calls_ast;
 mod communities;
 mod extract;
+mod graph_buffer;
 mod import_map;
 mod imports;
 mod inheritance;
@@ -10,6 +11,7 @@ mod routes;
 mod structure;
 
 pub use calls::*;
+pub use graph_buffer::GraphBuffer;
 pub use import_map::ImportMap;
 pub use registry::{CallResolution, FileCallResolver, SymbolRegistry};
 pub use communities::*;
@@ -277,15 +279,33 @@ impl Pipeline {
             })
             .collect();
 
+            let mut graph = GraphBuffer::new(project_name, repo_path.to_string_lossy().as_ref());
             let mut all_symbols = Vec::new();
             for result in &file_results {
                 all_symbols.extend(result.symbols.clone());
-                store.upsert_file(&result.source_file)?;
+                graph.upsert_file(result.source_file.clone());
+                graph.upsert_symbols_batch(&result.symbols);
             }
 
-            store.upsert_symbols_batch(&all_symbols)?;
-            let (call_edges, semantic) = finalize_index(&store, repo_path, project_name, self.mode)?;
+            let structural_edges =
+                finalize_graph_buffer(&mut graph, repo_path, project_name)?;
+            graph.flush_to_store(&store)?;
+
+            let semantic = if semantic::should_run(self.mode) {
+                semantic::run_semantic_pass(&store)?
+            } else {
+                semantic::SemanticResult {
+                    vectors_stored: 0,
+                    similar_edges: 0,
+                    semantically_related_edges: 0,
+                }
+            };
+            apply_communities(&store)?;
             store.set_meta("semantic_enabled", &semantic::is_enabled().to_string())?;
+
+            let call_edges = structural_edges
+                + semantic.similar_edges
+                + semantic.semantically_related_edges;
 
             let duration_ms = start.elapsed().as_millis() as u64;
             info!(
@@ -363,6 +383,7 @@ fn maybe_export_artifact(
     Ok(Some(path))
 }
 
+/// Incremental reindex still writes derived edges directly to the store.
 fn finalize_index(
     store: &Store,
     repo_path: &Path,
@@ -370,87 +391,15 @@ fn finalize_index(
     mode: IndexMode,
 ) -> Result<(usize, semantic::SemanticResult)> {
     let _phase = crate::runtime::profile::PhaseTimer::start("finalize_index");
-    let code_symbols: Vec<Symbol> = store
-        .list_symbols()?
-        .into_iter()
-        .filter(|s| !matches!(s.label.as_str(), "Project" | "Folder" | "File" | "Module"))
-        .collect();
-    let file_paths: Vec<String> = store.list_files()?.into_iter().map(|f| f.path).collect();
-    let symbol_qns: Vec<String> = code_symbols
-        .iter()
-        .map(|s| s.qualified_name.clone())
-        .collect();
-
-    store.delete_symbols_by_labels(&["Project", "Folder", "File", "Module"])?;
-    let (struct_symbols, struct_edges) = build_structure_graph(
-        project_name,
-        repo_path.to_string_lossy().as_ref(),
-        &file_paths,
-        &symbol_qns,
-    );
-    store.upsert_symbols_batch(&struct_symbols)?;
-
-    store.delete_edges_by_type("CONTAINS")?;
-    store.insert_edges_batch(&struct_edges)?;
-
-    let mut import_edges = Vec::new();
+    let mut graph = GraphBuffer::new(project_name, repo_path.to_string_lossy().as_ref());
     for file in store.list_files()? {
-        import_edges.extend(extract_import_edges(
-            &file.path,
-            &file.language,
-            &file.content,
-        ));
+        graph.upsert_file(file);
     }
-    store.delete_edges_by_type("IMPORTS")?;
-    store.insert_edges_batch(&import_edges)?;
-
-    let symbols_by_file: HashMap<String, Vec<Symbol>> =
-        code_symbols.iter().fold(HashMap::new(), |mut acc, sym| {
-            acc.entry(sym.file_path.clone())
-                .or_default()
-                .push(sym.clone());
-            acc
-        });
-
-    let call_edges = rebuild_call_edges(store, &code_symbols)?;
-    store.delete_edges_by_type("CALLS")?;
-    store.insert_edges_batch(&call_edges)?;
-
-    let mut route_edges = Vec::new();
-    for file in store.list_files()? {
-        if let Some(syms) = symbols_by_file.get(&file.path) {
-            route_edges.extend(extract_http_routes(
-                &file.path,
-                &file.language,
-                &file.content,
-                syms,
-            ));
-        }
+    for sym in store.list_symbols()? {
+        graph.upsert_symbol(sym);
     }
-    store.delete_edges_by_type("HTTP_ROUTE")?;
-    store.insert_edges_batch(&route_edges)?;
-
-    let mut inheritance_edges = Vec::new();
-    for file in store.list_files()? {
-        if let Some(syms) = symbols_by_file.get(&file.path) {
-            inheritance_edges.extend(extract_inheritance_edges(
-                &file.path,
-                &file.language,
-                &file.content,
-                syms,
-            ));
-        }
-    }
-    for edge_type in ["INHERITS", "IMPLEMENTS", "DECORATES"] {
-        store.delete_edges_by_type(edge_type)?;
-    }
-    store.insert_edges_batch(&inheritance_edges)?;
-
-    let mut edge_count = struct_edges.len()
-        + import_edges.len()
-        + call_edges.len()
-        + route_edges.len()
-        + inheritance_edges.len();
+    let structural = finalize_graph_buffer(&mut graph, repo_path, project_name)?;
+    graph.flush_to_store(store)?;
 
     let semantic = if semantic::should_run(mode) {
         semantic::run_semantic_pass(store)?
@@ -461,24 +410,117 @@ fn finalize_index(
             semantically_related_edges: 0,
         }
     };
-    edge_count += semantic.similar_edges + semantic.semantically_related_edges;
+    apply_communities(store)?;
+    let edge_count = structural + semantic.similar_edges + semantic.semantically_related_edges;
+    Ok((edge_count, semantic))
+}
 
+/// Build derived edges in memory before a single SQLite flush (reference graph_buffer).
+fn finalize_graph_buffer(
+    graph: &mut GraphBuffer,
+    repo_path: &Path,
+    project_name: &str,
+) -> Result<usize> {
+    let _phase = crate::runtime::profile::PhaseTimer::start("finalize_graph_buffer");
+    let code_symbols = graph.code_symbols();
+    let file_paths: Vec<String> = graph.list_files().into_iter().map(|f| f.path).collect();
+    let symbol_qns: Vec<String> = code_symbols
+        .iter()
+        .map(|s| s.qualified_name.clone())
+        .collect();
+
+    graph.delete_symbols_by_labels(&["Project", "Folder", "File", "Module"]);
+    let (struct_symbols, struct_edges) = build_structure_graph(
+        project_name,
+        repo_path.to_string_lossy().as_ref(),
+        &file_paths,
+        &symbol_qns,
+    );
+    graph.upsert_symbols_batch(&struct_symbols);
+    graph.delete_edges_by_type("CONTAINS");
+    graph.insert_edges_batch(&struct_edges);
+
+    let mut import_edges = Vec::new();
+    for file in graph.list_files() {
+        import_edges.extend(extract_import_edges(
+            &file.path,
+            &file.language,
+            &file.content,
+        ));
+    }
+    graph.delete_edges_by_type("IMPORTS");
+    graph.insert_edges_batch(&import_edges);
+
+    let symbols_by_file: HashMap<String, Vec<Symbol>> =
+        code_symbols.iter().fold(HashMap::new(), |mut acc, sym| {
+            acc.entry(sym.file_path.clone())
+                .or_default()
+                .push(sym.clone());
+            acc
+        });
+
+    let call_edges = rebuild_call_edges(graph, &code_symbols)?;
+    graph.delete_edges_by_type("CALLS");
+    graph.insert_edges_batch(&call_edges);
+
+    let mut route_edges = Vec::new();
+    for file in graph.list_files() {
+        if let Some(syms) = symbols_by_file.get(&file.path) {
+            route_edges.extend(extract_http_routes(
+                &file.path,
+                &file.language,
+                &file.content,
+                syms,
+            ));
+        }
+    }
+    graph.delete_edges_by_type("HTTP_ROUTE");
+    graph.insert_edges_batch(&route_edges);
+
+    let mut inheritance_edges = Vec::new();
+    for file in graph.list_files() {
+        if let Some(syms) = symbols_by_file.get(&file.path) {
+            inheritance_edges.extend(extract_inheritance_edges(
+                &file.path,
+                &file.language,
+                &file.content,
+                syms,
+            ));
+        }
+    }
+    for edge_type in ["INHERITS", "IMPLEMENTS", "DECORATES"] {
+        graph.delete_edges_by_type(edge_type);
+    }
+    graph.insert_edges_batch(&inheritance_edges);
+
+    Ok(struct_edges.len()
+        + import_edges.len()
+        + call_edges.len()
+        + route_edges.len()
+        + inheritance_edges.len())
+}
+
+fn apply_communities(store: &Store) -> Result<()> {
+    let code_symbols: Vec<Symbol> = store
+        .list_symbols()?
+        .into_iter()
+        .filter(|s| !matches!(s.label.as_str(), "Project" | "Folder" | "File" | "Module"))
+        .collect();
     let all_edges = store.list_edges()?;
     let community_result = detect_communities(&code_symbols, &all_edges);
-    let mut updated_symbols = code_symbols.clone();
+    let mut updated_symbols = code_symbols;
     apply_community_properties(&mut updated_symbols, &community_result);
     store.upsert_symbols_batch(&updated_symbols)?;
     store.set_meta(
         "community_count",
         &community_result.community_count.to_string(),
     )?;
-
-    Ok((edge_count, semantic))
+    Ok(())
 }
 
-fn rebuild_call_edges(store: &Store, code_symbols: &[Symbol]) -> Result<Vec<Edge>> {
+fn rebuild_call_edges(graph: &GraphBuffer, code_symbols: &[Symbol]) -> Result<Vec<Edge>> {
     let registry = build_symbol_registry(code_symbols);
-    let files = store.list_files()?;
+    let files = graph.list_files();
     let symbols_by_file: HashMap<String, Vec<Symbol>> =
         code_symbols.iter().fold(HashMap::new(), |mut acc, sym| {
             acc.entry(sym.file_path.clone())
@@ -488,7 +530,7 @@ fn rebuild_call_edges(store: &Store, code_symbols: &[Symbol]) -> Result<Vec<Edge
         });
 
     let mut edges = Vec::new();
-    for file in files {
+    for file in &files {
         if let Some(symbols) = symbols_by_file.get(&file.path) {
             edges.extend(resolve_calls_with_registry(
                 symbols,

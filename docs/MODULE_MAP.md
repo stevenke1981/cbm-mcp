@@ -27,7 +27,7 @@
 | `src/mcp/` | JSON-RPC MCP server | `src/mcp/` | Partial | 14 tools; no process-level inspector smoke yet |
 | `src/pipeline/` | Index passes + registry | `src/pipeline/` | Partial | ~8 passes vs ~20 reference passes |
 | `src/store/` | SQLite graph CRUD | `src/store/` | Partial | Bulk tx done; no read-only query mode |
-| `src/graph_buffer/` | In-memory staging | — | **Missing** | Writes go direct to `Store` |
+| `src/graph_buffer/` | In-memory staging | `pipeline/graph_buffer.rs` | **Partial** | MVP staging + edge dedup + single flush; no parallel worker merge |
 | `src/discover/` | File discovery + language | `src/discover.rs` | Partial | `.gitignore`/`.cbmignore`; 7 langs vs 159 grammars |
 | `src/semantic/` | 11-signal similarity | `src/semantic/` | MVP | All signals wired; weights not reference-tuned |
 | `src/simhash/` | MinHash structures | `src/semantic/signals.rs` | Partial | Embedded in semantic module |
@@ -90,8 +90,8 @@ Checked-in tool schemas: `mcps/codebase-memory-mcp/tools/*.json` (snapshot-teste
 
 | Reference | Rust | Status |
 |-----------|------|--------|
-| In-memory node/edge arena during index | Direct `Store` writes in `pipeline/mod.rs` | **Missing** |
-| Bulk dump buffer → SQLite | Single bulk transaction wrap | Partial |
+| In-memory node/edge arena during index | `GraphBuffer` in `pipeline/mod.rs` | **Partial** |
+| Bulk dump buffer → SQLite | `flush_to_store` inside bulk transaction | **Partial** |
 
 **Next slice:** add staging layer before SQLite flush (P0 in `TODO.md`).
 

@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** LSP subprocess cross-file · graph buffer staging · wire `target_projects` · `manage_adr_sections` decision.
+**Next P0 slices:** LSP subprocess cross-file · wire `target_projects` · `manage_adr_sections` decision.
 
-**In progress:** `SymbolRegistry` + import-map CALLS (`registry.rs`, `import_map.rs`) — AST for Rust/Python/JS/Go/Java; import-aware cross-file resolution.
+**Done recently:** `SymbolRegistry` + import-map CALLS · `GraphBuffer` staging (`graph_buffer.rs`).
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -142,7 +142,7 @@ Acceptance criteria:
   - git/history metadata
   - communities
   - post-processing summaries
-- [ ] Add a graph buffer staging layer equivalent to reference `graph_buffer`.
+- [x] Add a graph buffer staging layer equivalent to reference `graph_buffer` (`src/pipeline/graph_buffer.rs`; `finalize_graph_buffer` + `flush_to_store`).
 - [ ] Add per-pass metrics:
   - files visited
   - files skipped

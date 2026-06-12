@@ -25,7 +25,7 @@ Target: feature-equivalent Rust rewrite of `D:\_cbm-ref` (DeusData/codebase-memo
 - [ ] Cypher in `query_graph` (or document SQL-only deviation)
 - [ ] `trace_path` data_flow / cross_service modes
 - [ ] 159-language tree-sitter coverage (vendored grammars)
-- [ ] Graph buffer staging layer
+- [x] Graph buffer staging layer (`pipeline/graph_buffer.rs`)
 
 ## P2 — platform parity
 
