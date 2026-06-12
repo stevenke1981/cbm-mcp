@@ -151,6 +151,57 @@ fn nested_python_function_does_not_false_positive_outer() {
 }
 
 #[test]
+fn rust_pipeline_resolves_impl_self_method_call() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("lib.rs"),
+        "struct Foo;\n\nimpl Foo {\n    fn bar(&self) {\n        self.baz();\n    }\n    fn baz(&self) {}\n}\n",
+    )
+    .unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("rs-impl-calls")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    assert!(
+        has_call(&store, "lib.rs", "bar", "baz"),
+        "expected bar -> baz within impl Foo"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
+fn c_pipeline_resolves_local_call_with_ast_metadata() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("main.c"),
+        "void helper() {}\n\nint main() {\n    helper();\n    return 0;\n}\n",
+    )
+    .unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("c-ast-calls")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+    assert!(has_call(&store, "main.c", "main", "helper"));
+
+    let edge = calls_edges(&store)
+        .into_iter()
+        .find(|e| e.dst_qn.contains("helper"))
+        .expect("CALLS edge");
+    assert!(
+        edge.properties_json
+            .as_ref()
+            .is_some_and(|p| p.contains("ast")),
+        "expected AST metadata for C CALLS"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
 fn c_pipeline_skips_ambiguous_cross_file_calls() {
     let (_guard, _cache, _) = isolated_cache();
     let dir = TempDir::new().unwrap();

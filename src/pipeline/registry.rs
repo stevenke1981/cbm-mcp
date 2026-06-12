@@ -31,6 +31,7 @@ pub struct CallResolution {
 pub struct SymbolRegistry {
     exact: HashMap<String, String>,
     by_name: HashMap<String, Vec<String>>,
+    parent_class: HashMap<String, String>,
 }
 
 impl SymbolRegistry {
@@ -48,11 +49,19 @@ impl SymbolRegistry {
         }
         self.exact
             .insert(sym.qualified_name.clone(), sym.label.clone());
+        if let Some(parent) = parent_class_from_props(&sym.properties_json) {
+            self.parent_class
+                .insert(sym.qualified_name.clone(), parent);
+        }
         let simple = simple_name(&sym.qualified_name);
         self.by_name
             .entry(simple)
             .or_default()
             .push(sym.qualified_name.clone());
+    }
+
+    fn candidate_parent_class(&self, qn: &str) -> Option<&str> {
+        self.parent_class.get(qn).map(String::as_str)
     }
 
     pub fn candidates(&self, callee_name: &str) -> &[String] {
@@ -70,12 +79,18 @@ impl SymbolRegistry {
             CallTargetKind::Any => candidates.to_vec(),
             CallTargetKind::FreeFunction => candidates
                 .iter()
-                .filter(|qn| self.symbol_label(qn) == Some("Function"))
+                .filter(|qn| {
+                    self.symbol_label(qn) == Some("Function")
+                        && self.candidate_parent_class(qn).is_none()
+                })
                 .cloned()
                 .collect(),
             CallTargetKind::Method => candidates
                 .iter()
-                .filter(|qn| self.symbol_label(qn) == Some("Method"))
+                .filter(|qn| {
+                    self.symbol_label(qn) == Some("Method")
+                        || self.candidate_parent_class(qn).is_some()
+                })
                 .cloned()
                 .collect(),
         }
@@ -92,11 +107,35 @@ impl SymbolRegistry {
         imports: &ImportMap,
         kind: CallTargetKind,
     ) -> Option<CallResolution> {
+        self.resolve_kind_scoped(callee_name, caller_file, imports, kind, None)
+    }
+
+    pub fn resolve_kind_scoped(
+        &self,
+        callee_name: &str,
+        caller_file: &str,
+        imports: &ImportMap,
+        kind: CallTargetKind,
+        parent_class: Option<&str>,
+    ) -> Option<CallResolution> {
         if callee_name.is_empty() {
             return None;
         }
 
-        let candidates = self.filter_by_kind(self.candidates(callee_name), kind);
+        let mut candidates = self.filter_by_kind(self.candidates(callee_name), kind);
+        if let Some(parent) = parent_class {
+            let scoped: Vec<String> = candidates
+                .iter()
+                .filter(|qn| {
+                    self.candidate_parent_class(qn)
+                        .is_some_and(|p| p == parent)
+                })
+                .cloned()
+                .collect();
+            if !scoped.is_empty() {
+                candidates = scoped;
+            }
+        }
         if candidates.is_empty() {
             return None;
         }
@@ -178,6 +217,15 @@ impl SymbolRegistry {
 
         None
     }
+}
+
+pub fn parent_class_from_props(properties_json: &Option<String>) -> Option<String> {
+    let props = properties_json.as_ref()?;
+    let key = "\"parent_class\":\"";
+    let start = props.find(key)? + key.len();
+    let rest = &props[start..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
 }
 
 pub fn confidence_band(score: f64) -> &'static str {
@@ -278,15 +326,25 @@ impl<'a> FileCallResolver<'a> {
         callee_name: &str,
         kind: CallTargetKind,
     ) -> Option<CallResolution> {
-        let cache_key = format!("{callee_name}:{kind:?}");
+        self.resolve_kind_scoped(callee_name, kind, None)
+    }
+
+    pub fn resolve_kind_scoped(
+        &mut self,
+        callee_name: &str,
+        kind: CallTargetKind,
+        parent_class: Option<&str>,
+    ) -> Option<CallResolution> {
+        let cache_key = format!("{callee_name}:{kind:?}:{parent_class:?}");
         if let Some(hit) = self.cache.get(&cache_key) {
             return hit.clone();
         }
-        let res = self.registry.resolve_kind(
+        let res = self.registry.resolve_kind_scoped(
             callee_name,
             &self.caller_file,
             &self.imports,
             kind,
+            parent_class,
         );
         self.cache.insert(cache_key, res.clone());
         res

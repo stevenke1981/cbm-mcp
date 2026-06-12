@@ -154,7 +154,7 @@ fn java_pipeline_resolves_imported_class_method_via_lsp_cross() {
 
     let main_calls: Vec<_> = calls_edges(&store)
         .into_iter()
-        .filter(|e| e.src_qn.contains("Main.java::Function::main@"))
+        .filter(|e| e.src_qn.contains("Main.java::") && e.src_qn.contains("::main@"))
         .collect();
     assert!(
         main_calls
@@ -200,7 +200,7 @@ fn java_pipeline_skips_ambiguous_cross_file_greeter_without_import() {
 
     let main_calls: Vec<_> = calls_edges(&store)
         .into_iter()
-        .filter(|e| e.src_qn.contains("Main.java::Function::main@"))
+        .filter(|e| e.src_qn.contains("Main.java::") && e.src_qn.contains("::main@"))
         .collect();
     assert!(
         main_calls.iter().all(|e| {

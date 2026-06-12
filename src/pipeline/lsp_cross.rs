@@ -4,7 +4,7 @@
 //! Supports Python, JavaScript/TypeScript, Go, and Java imported-type method dispatch.
 
 use crate::pipeline::import_map::ImportMap;
-use crate::pipeline::registry::{confidence_band, CallResolution};
+use crate::pipeline::registry::{confidence_band, parent_class_from_props, CallResolution};
 use crate::store::{Edge, SourceFile, Symbol};
 use std::collections::{HashMap, HashSet};
 use streaming_iterator::StreamingIterator;
@@ -22,7 +22,7 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
     for file in files {
         let file_syms: Vec<&Symbol> = symbols
             .iter()
-            .filter(|s| s.file_path == file.path && s.label == "Function")
+            .filter(|s| s.file_path == file.path && is_callable_symbol(s))
             .collect();
         if file_syms.is_empty() {
             continue;
@@ -158,10 +158,18 @@ fn build_class_index(symbols: &[Symbol]) -> HashMap<String, Vec<ClassEntry>> {
     index
 }
 
+fn is_callable_symbol(sym: &Symbol) -> bool {
+    sym.label == "Function" || sym.label == "Method"
+}
+
+fn is_method_entry(sym: &Symbol) -> bool {
+    sym.label == "Method" || parent_class_from_props(&sym.properties_json).is_some()
+}
+
 fn build_methods_by_file(symbols: &[Symbol]) -> HashMap<String, Vec<MethodEntry>> {
     let mut by_file: HashMap<String, Vec<MethodEntry>> = HashMap::new();
     for sym in symbols {
-        if sym.label != "Function" {
+        if !is_method_entry(sym) {
             continue;
         }
         by_file
@@ -171,6 +179,7 @@ fn build_methods_by_file(symbols: &[Symbol]) -> HashMap<String, Vec<MethodEntry>
                 name: sym.name.clone(),
                 qn: sym.qualified_name.clone(),
                 line: sym.line_start,
+                parent_class: parent_class_from_props(&sym.properties_json),
             });
     }
     for methods in by_file.values_mut() {
@@ -190,6 +199,7 @@ struct MethodEntry {
     name: String,
     qn: String,
     line: i64,
+    parent_class: Option<String>,
 }
 
 fn infer_python_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
@@ -458,7 +468,13 @@ fn resolve_class_method(
     let methods = methods_by_file.get(&class_entry.file)?;
     let class_methods: Vec<&MethodEntry> = methods
         .iter()
-        .filter(|m| m.line > class_entry.line && m.name == method_name)
+        .filter(|m| {
+            m.name == method_name
+                && m.line > class_entry.line
+                && m.parent_class
+                    .as_ref()
+                    .is_none_or(|p| p == class_name)
+        })
         .collect();
     if class_methods.len() != 1 {
         return None;
@@ -546,7 +562,7 @@ mod tests {
         let symbols = vec![
             sym("main.py", "Function", "main", 3),
             sym("greeter.py", "Class", "Greeter", 1),
-            sym("greeter.py", "Function", "greet", 2),
+            sym("greeter.py", "Method", "greet", 2),
         ];
         let files = vec![SourceFile {
             path: "main.py".into(),
@@ -566,7 +582,7 @@ mod tests {
         let symbols = vec![
             sym("main.js", "Function", "main", 3),
             sym("greeter.js", "Class", "Greeter", 1),
-            sym("greeter.js", "Function", "greet", 2),
+            sym("greeter.js", "Method", "greet", 2),
         ];
         let files = vec![SourceFile {
             path: "main.js".into(),
@@ -586,7 +602,7 @@ mod tests {
         let symbols = vec![
             sym("Main.java", "Function", "main", 4),
             sym("greeter/Greeter.java", "Class", "Greeter", 1),
-            sym("greeter/Greeter.java", "Function", "greet", 2),
+            sym("greeter/Greeter.java", "Method", "greet", 2),
         ];
         let files = vec![SourceFile {
             path: "Main.java".into(),
@@ -606,7 +622,7 @@ mod tests {
         let symbols = vec![
             sym("main.go", "Function", "main", 5),
             sym("greeter.go", "Class", "Greeter", 3),
-            sym("greeter.go", "Function", "Greet", 4),
+            sym("greeter.go", "Method", "Greet", 4),
         ];
         let files = vec![SourceFile {
             path: "main.go".into(),

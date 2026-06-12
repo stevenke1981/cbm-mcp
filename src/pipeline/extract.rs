@@ -62,9 +62,56 @@ pub fn extract_symbols(file_path: &str, language: &str, content: &str) -> Result
     }
 
     if symbols.is_empty() {
-        return Ok(extract_symbols_regex(file_path, language, content));
+        let mut symbols = extract_symbols_regex(file_path, language, content);
+        attach_enclosing_types(&mut symbols);
+        return Ok(symbols);
     }
+    attach_enclosing_types(&mut symbols);
     Ok(symbols)
+}
+
+/// Attach `parent_class` to methods nested inside class/impl/trait bodies.
+fn attach_enclosing_types(symbols: &mut [Symbol]) {
+    let mut indices: Vec<usize> = (0..symbols.len()).collect();
+    indices.sort_by_key(|&i| (symbols[i].file_path.clone(), symbols[i].line_start));
+
+    let mut i = 0;
+    while i < indices.len() {
+        let file = symbols[indices[i]].file_path.clone();
+        let mut file_indices = Vec::new();
+        while i < indices.len() && symbols[indices[i]].file_path == file {
+            file_indices.push(indices[i]);
+            i += 1;
+        }
+
+        let containers: Vec<(i64, i64, String)> = file_indices
+            .iter()
+            .filter(|&&idx| symbols[idx].label == "Class")
+            .map(|&idx| {
+                (
+                    symbols[idx].line_start,
+                    symbols[idx].line_end,
+                    symbols[idx].name.clone(),
+                )
+            })
+            .collect();
+
+        for idx in file_indices {
+            let sym = &symbols[idx];
+            if sym.label != "Method" && sym.label != "Function" {
+                continue;
+            }
+            let Some((_, _, parent)) = containers
+                .iter()
+                .filter(|(start, end, _)| sym.line_start > *start && sym.line_start <= *end)
+                .max_by_key(|(start, _, _)| start)
+            else {
+                continue;
+            };
+            let props = format!(r#"{{"parent_class":"{parent}"}}"#);
+            symbols[idx].properties_json = Some(props);
+        }
+    }
 }
 
 fn language_for_ts(language: &str) -> Option<Language> {

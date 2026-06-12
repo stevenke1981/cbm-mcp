@@ -1,4 +1,6 @@
-use crate::pipeline::registry::{CallResolution, CallTargetKind, FileCallResolver};
+use crate::pipeline::registry::{
+    parent_class_from_props, CallResolution, CallTargetKind, FileCallResolver,
+};
 use crate::store::{Edge, Symbol};
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Language, Parser, Query, QueryCursor};
@@ -71,7 +73,13 @@ pub fn resolve_calls_ast(
             if call_line < sym.line_start || call_line > sym.line_end {
                 continue;
             }
-            if let Some(res) = resolver.resolve_kind(&callee, kind) {
+            let parent_class = parent_class_from_props(&sym.properties_json);
+            let res = if kind == CallTargetKind::Method {
+                resolver.resolve_kind_scoped(&callee, kind, parent_class.as_deref())
+            } else {
+                resolver.resolve_kind(&callee, kind)
+            };
+            if let Some(res) = res {
                 push_edge(&mut edges, &mut seen, sym, &res, "ast");
             }
         }
@@ -87,6 +95,8 @@ fn language_to_tree_sitter(language: &str) -> Option<Language> {
         "typescript" | "tsx" => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
         "go" => tree_sitter_go::LANGUAGE.into(),
         "java" => tree_sitter_java::LANGUAGE.into(),
+        "c" => tree_sitter_c::LANGUAGE.into(),
+        "cpp" => tree_sitter_cpp::LANGUAGE.into(),
         _ => return None,
     })
 }
@@ -130,6 +140,14 @@ fn call_query_for(language: &str) -> Option<&'static str> {
 (method_invocation
   object: (_)
   name: (identifier) @method)
+"#,
+        "c" | "cpp" => r#"
+(call_expression
+  function: (identifier) @callee)
+(call_expression
+  function: (field_expression
+    argument: (_)
+    field: (field_identifier) @method))
 "#,
         _ => return None,
     })
