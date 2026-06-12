@@ -9,6 +9,7 @@ use crate::pipeline::registry::{
 };
 use crate::store::{Edge, SourceFile, Symbol};
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Language, Parser, Query, QueryCursor};
 
@@ -17,6 +18,14 @@ const LSP_CROSS_CONFIDENCE: f64 = 0.85;
 const JS_LANGS: &[&str] = &["javascript", "jsx", "typescript", "tsx"];
 
 pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec<Edge> {
+    resolve_cross_file_calls_root(symbols, files, None)
+}
+
+pub fn resolve_cross_file_calls_root(
+    symbols: &[Symbol],
+    files: &[SourceFile],
+    repo_root: Option<&Path>,
+) -> Vec<Edge> {
     let mut edges = Vec::new();
     let class_index = build_class_index(symbols);
     let methods_by_file = build_methods_by_file(symbols);
@@ -32,7 +41,8 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
 
         match file.language.as_str() {
             "python" => {
-                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let imports =
+                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
                 let bindings = infer_python_type_bindings(&file.content, &imports);
                 edges.extend(resolve_attribute_calls(
                     AttributeCallConfig {
@@ -49,7 +59,8 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
                 ));
             }
             lang if JS_LANGS.contains(&lang) => {
-                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let imports =
+                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
                 let bindings = infer_js_type_bindings(&file.content, &imports);
                 let ts_lang = if matches!(lang, "typescript" | "tsx") {
                     tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
@@ -71,7 +82,8 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
                 ));
             }
             "go" => {
-                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let imports =
+                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
                 let bindings =
                     infer_go_type_bindings(&file.content, &imports, &class_index, &methods_by_file);
                 edges.extend(resolve_attribute_calls(
@@ -89,7 +101,8 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
                 ));
             }
             "java" => {
-                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let imports =
+                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
                 let bindings = infer_java_type_bindings(&file.content, &imports);
                 edges.extend(resolve_attribute_calls(
                     AttributeCallConfig {
@@ -106,7 +119,8 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
                 ));
             }
             "php" => {
-                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let imports =
+                    ImportMap::parse_with_root(&file.path, &file.language, &file.content, repo_root);
                 let bindings = infer_php_type_bindings(&file.content, &imports);
                 edges.extend(resolve_attribute_calls(
                     AttributeCallConfig {

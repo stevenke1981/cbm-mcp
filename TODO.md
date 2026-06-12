@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** PHP require/autoload hardening.
+**Next P0 slices:** (pick from P0 backlog — negative CALLS fixtures, MCP JSON-RPC parity, or incremental index).
 
-**Done recently:** CALLS edge confidence metadata (`callee`/`confidence`/`strategy`/`candidates`) · C# CALLS AST · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
+**Done recently:** PHP require/autoload hardening (`require`/`include` + composer PSR-4) · CALLS confidence metadata · C# CALLS AST · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -173,7 +173,7 @@ Acceptance criteria:
   - [x] Java AST pass
   - [~] C/C++ (C AST pass done; cpp shares query)
   - [x] C# (tree-sitter `invocation_expression`; requires `tree-sitter` ≥ 0.25 for grammar ABI 15)
-  - [~] PHP (tree-sitter extract + `lsp_cross` MVP; full `php_lsp.c` parity pending)
+  - [~] PHP (tree-sitter extract + `lsp_cross` + require/include + composer PSR-4; full `php_lsp.c` parity pending)
 - [~] Add LSP-assisted cross-file resolution where the reference uses it (Python/JS/TS/Go/Java/PHP `lsp_cross.rs` MVP).
 - [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).
 - [x] Add method vs free-function disambiguation (`CallTargetKind` + Method label in extract).

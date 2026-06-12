@@ -462,7 +462,7 @@ fn finalize_graph_buffer(
             acc
         });
 
-    let call_edges = rebuild_call_edges(graph, &code_symbols)?;
+    let call_edges = rebuild_call_edges(graph, &code_symbols, repo_path)?;
     graph.delete_edges_by_type("CALLS");
     graph.insert_edges_batch(&call_edges);
 
@@ -521,7 +521,11 @@ fn apply_communities(store: &Store) -> Result<()> {
     Ok(())
 }
 
-fn rebuild_call_edges(graph: &GraphBuffer, code_symbols: &[Symbol]) -> Result<Vec<Edge>> {
+fn rebuild_call_edges(
+    graph: &GraphBuffer,
+    code_symbols: &[Symbol],
+    repo_path: &Path,
+) -> Result<Vec<Edge>> {
     let registry = build_symbol_registry(code_symbols);
     let files = graph.list_files();
     let symbols_by_file: HashMap<String, Vec<Symbol>> =
@@ -535,16 +539,17 @@ fn rebuild_call_edges(graph: &GraphBuffer, code_symbols: &[Symbol]) -> Result<Ve
     let mut edges = Vec::new();
     for file in &files {
         if let Some(symbols) = symbols_by_file.get(&file.path) {
-            edges.extend(resolve_calls_with_registry(
+            edges.extend(resolve_calls_with_registry_root(
                 symbols,
                 &file.content,
                 &file.language,
                 &registry,
                 &file.path,
+                Some(repo_path),
             ));
         }
     }
-    let cross = lsp_cross::resolve_cross_file_calls(code_symbols, &files);
+    let cross = lsp_cross::resolve_cross_file_calls_root(code_symbols, &files, Some(repo_path));
     edges = merge_call_edges(edges, cross);
     Ok(edges)
 }

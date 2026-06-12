@@ -14,6 +14,10 @@ pub fn extract_import_edges(file_path: &str, language: &str, content: &str) -> V
             r#"(?m)require\(['"]([^'"]+)['"]\)"#,
         ],
         "go" => &[r#"(?m)^\s*import\s+"([^"]+)""#, r#"(?m)^\s*import\s+(\w+)"#],
+        "php" => &[
+            r"(?m)^\s*use\s+([\w\\]+)",
+            r#"(?i)(?:require|include)(?:_once)?\s*(?:\(\s*)?['"]([^'"]+)['"]"#,
+        ],
         _ => &[],
     };
 

@@ -13,6 +13,15 @@ pub struct ImportMap {
 
 impl ImportMap {
     pub fn parse(file_path: &str, language: &str, content: &str) -> Self {
+        Self::parse_with_root(file_path, language, content, None)
+    }
+
+    pub fn parse_with_root(
+        file_path: &str,
+        language: &str,
+        content: &str,
+        repo_root: Option<&Path>,
+    ) -> Self {
         let mut map = ImportMap::default();
         let caller_dir = Path::new(file_path)
             .parent()
@@ -27,7 +36,7 @@ impl ImportMap {
             }
             "go" => parse_go_imports(content, &mut map),
             "java" => parse_java_imports(content, &mut map),
-            "php" => parse_php_imports(content, &mut map),
+            "php" => parse_php_imports(file_path, &caller_dir, content, repo_root, &mut map),
             _ => {}
         }
         map
@@ -232,23 +241,78 @@ fn java_package_glob(package: &str) -> String {
     format!("{}/", package.replace('.', "/"))
 }
 
-fn parse_php_imports(content: &str, map: &mut ImportMap) {
-    let use_re =
-        Regex::new(r"(?m)^\s*use\s+([\w\\]+)(?:\s+as\s+(\w+))?\s*;").unwrap();
+fn parse_php_imports(
+    file_path: &str,
+    caller_dir: &str,
+    content: &str,
+    repo_root: Option<&Path>,
+    map: &mut ImportMap,
+) {
+    let psr4 = load_composer_psr4(file_path, repo_root);
+
+    let use_re = Regex::new(
+        r"(?m)^\s*use\s+(?:function|const\s+)?([\w\\]+)(?:\s+as\s+(\w+))?\s*;",
+    )
+    .unwrap();
     for cap in use_re.captures_iter(content) {
         let path = cap.get(1).map(|m| m.as_str()).unwrap_or("");
-        if path.is_empty() {
+        if path.is_empty() || !path.contains('\\') {
             continue;
         }
-        let alias = cap.get(2).map(|m| m.as_str());
-        let class_name = alias.unwrap_or_else(|| path.rsplit('\\').next().unwrap_or(path));
-        let target = php_use_to_file(path);
-        map.bindings.insert(class_name.to_string(), target.clone());
-        map.modules.push(target);
+        bind_php_use(path, cap.get(2).map(|m| m.as_str()), &psr4, map);
+    }
+
+    let grouped_use_re =
+        Regex::new(r"(?m)^\s*use\s+([\w\\]+)\s*\\\s*\{([^}]+)\}\s*;").unwrap();
+    for cap in grouped_use_re.captures_iter(content) {
+        let prefix = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let items = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        for item in items.split(',') {
+            let item = item.trim();
+            if item.is_empty() {
+                continue;
+            }
+            let (path, alias) = item
+                .split_once(" as ")
+                .map(|(p, a)| (format!("{prefix}\\{p}"), Some(a.trim())))
+                .unwrap_or_else(|| (format!("{prefix}\\{item}"), None));
+            bind_php_use(&path, alias, &psr4, map);
+        }
+    }
+
+    let require_re = Regex::new(
+        r#"(?i)(?:require|include)(?:_once)?\s*(?:\(\s*)?['"]([^'"]+)['"]"#,
+    )
+    .unwrap();
+    for cap in require_re.captures_iter(content) {
+        let target = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        if target.is_empty() {
+            continue;
+        }
+        let resolved = resolve_php_path(file_path, caller_dir, target);
+        map.modules.push(resolved.clone());
+        if let Some(stem) = Path::new(&resolved)
+            .file_stem()
+            .and_then(|s| s.to_str())
+        {
+            map.bindings
+                .entry(stem.to_string())
+                .or_insert_with(|| resolved);
+        }
     }
 }
 
-fn php_use_to_file(use_path: &str) -> String {
+fn bind_php_use(use_path: &str, alias: Option<&str>, psr4: &[(String, String)], map: &mut ImportMap) {
+    let class_name = alias.unwrap_or_else(|| use_path.rsplit('\\').next().unwrap_or(use_path));
+    let target = php_use_to_file(use_path, psr4);
+    map.bindings.insert(class_name.to_string(), target.clone());
+    map.modules.push(target);
+}
+
+fn php_use_to_file(use_path: &str, psr4: &[(String, String)]) -> String {
+    if let Some(path) = psr4_resolve(use_path, psr4) {
+        return path;
+    }
     let parts: Vec<&str> = use_path.split('\\').collect();
     if parts.len() < 2 {
         return format!("{use_path}.php");
@@ -258,6 +322,110 @@ fn php_use_to_file(use_path: &str) -> String {
         .join("/")
         .to_ascii_lowercase();
     format!("{pkg}/{class_name}.php")
+}
+
+fn psr4_resolve(use_path: &str, psr4: &[(String, String)]) -> Option<String> {
+    let mut best: Option<(usize, String)> = None;
+    for (prefix, dir) in psr4 {
+        if use_path.starts_with(prefix) {
+            let suffix = &use_path[prefix.len()..];
+            let rel = if suffix.is_empty() {
+                String::new()
+            } else {
+                suffix.replace('\\', "/")
+            };
+            let class_name = use_path.rsplit('\\').next().unwrap_or(use_path);
+            let path = if rel.is_empty() {
+                format!("{dir}/{class_name}.php")
+            } else {
+                format!("{dir}/{rel}.php")
+            };
+            let normalized = normalize_path(&path);
+            if best.as_ref().is_none_or(|(len, _)| prefix.len() > *len) {
+                best = Some((prefix.len(), normalized));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+fn resolve_php_path(file_path: &str, caller_dir: &str, target: &str) -> String {
+    let normalized = target.replace('\\', "/");
+    if normalized.starts_with('/') {
+        let path = normalize_path(&normalized);
+        return if path.ends_with(".php") {
+            path
+        } else {
+            format!("{path}.php")
+        };
+    }
+
+    let base = if caller_dir.is_empty() {
+        PathBuf::from(Path::new(file_path).parent().unwrap_or(Path::new(".")))
+    } else {
+        PathBuf::from(caller_dir)
+    };
+    let rel = normalized
+        .strip_prefix("./")
+        .unwrap_or(normalized.as_str());
+    let joined = base.join(rel);
+    let mut path = normalize_path(&joined.to_string_lossy());
+    while path.contains("/./") {
+        path = path.replace("/./", "/");
+    }
+    if !path.ends_with(".php") {
+        path.push_str(".php");
+    }
+    path
+}
+
+fn load_composer_psr4(file_path: &str, repo_root: Option<&Path>) -> Vec<(String, String)> {
+    let base = repo_root.unwrap_or(Path::new("."));
+    let mut dir = base.join(
+        Path::new(file_path)
+            .parent()
+            .unwrap_or(Path::new(".")),
+    );
+    for _ in 0..8 {
+        let composer = dir.join("composer.json");
+        if composer.is_file() {
+            if let Ok(raw) = std::fs::read_to_string(&composer) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    return parse_composer_psr4(&v, &dir);
+                }
+            }
+            break;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    Vec::new()
+}
+
+fn parse_composer_psr4(root: &serde_json::Value, composer_dir: &Path) -> Vec<(String, String)> {
+    let Some(psr4) = root
+        .pointer("/autoload/psr-4")
+        .or_else(|| root.pointer("/autoload-dev/psr-4"))
+        .and_then(|v| v.as_object())
+    else {
+        return Vec::new();
+    };
+
+    let mut entries = Vec::new();
+    for (prefix, dir_val) in psr4 {
+        let Some(dir) = dir_val.as_str() else {
+            continue;
+        };
+        let mut norm_prefix = prefix.replace('/', "\\");
+        if !norm_prefix.ends_with('\\') {
+            norm_prefix.push('\\');
+        }
+        let base = normalize_path(&composer_dir.join(dir).to_string_lossy());
+        entries.push((norm_prefix, base));
+    }
+    entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    entries
 }
 
 fn parse_go_imports(content: &str, map: &mut ImportMap) {
@@ -335,6 +503,44 @@ mod tests {
         assert_eq!(
             map.bindings.get("Greeter").map(String::as_str),
             Some("greeter/Greeter.php")
+        );
+    }
+
+    #[test]
+    fn php_require_once_adds_reachable_module() {
+        let src = "<?php\nrequire_once 'config.php';\nclass App {}\n";
+        let map = ImportMap::parse("main.php", "php", src);
+        assert!(map.modules.iter().any(|m| m == "config.php"));
+        assert!(map.is_reachable("config.php"));
+    }
+
+    #[test]
+    fn php_require_resolves_relative_subdirectory() {
+        let src = "<?php\nrequire 'lib/helper.php';\n";
+        let map = ImportMap::parse("src/main.php", "php", src);
+        assert!(map.modules.iter().any(|m| m == "src/lib/helper.php"));
+    }
+
+    #[test]
+    fn php_grouped_use_binds_multiple_classes() {
+        let src = "<?php\nuse App\\Models\\{User, Post};\n";
+        let map = ImportMap::parse("main.php", "php", src);
+        assert_eq!(
+            map.bindings.get("User").map(String::as_str),
+            Some("app/models/User.php")
+        );
+        assert_eq!(
+            map.bindings.get("Post").map(String::as_str),
+            Some("app/models/Post.php")
+        );
+    }
+
+    #[test]
+    fn php_psr4_maps_namespace_to_src_directory() {
+        let psr4 = vec![(r"App\".to_string(), "src".to_string())];
+        assert_eq!(
+            php_use_to_file("App\\Service\\Helper", &psr4),
+            "src/Service/Helper.php"
         );
     }
 

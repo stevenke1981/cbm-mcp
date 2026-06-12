@@ -162,6 +162,76 @@ fn php_pipeline_resolves_imported_class_method_via_lsp_cross() {
 }
 
 #[test]
+fn php_pipeline_resolves_required_helper_over_ambiguous_decoys() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("main.php"),
+        "<?php\nrequire_once 'helper.php';\n\nfunction main() {\n    helper();\n}\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("helper.php"), "<?php\nfunction helper() {}\n").unwrap();
+    std::fs::write(dir.path().join("a.php"), "<?php\nfunction helper() {}\n").unwrap();
+    std::fs::write(dir.path().join("b.php"), "<?php\nfunction helper() {}\n").unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("php-require-calls")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.php::") && e.src_qn.contains("::main@"))
+        .collect();
+    assert_eq!(main_calls.len(), 1, "expected one CALLS from main: {main_calls:?}");
+    assert!(
+        main_calls[0].dst_qn.starts_with("helper.php::"),
+        "require_once should prefer required helper.php, got {}",
+        main_calls[0].dst_qn
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
+fn php_pipeline_resolves_psr4_namespace_via_composer_autoload() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("src/Service")).unwrap();
+    std::fs::write(
+        dir.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("main.php"),
+        "<?php\nuse App\\Service\\Helper;\n\nfunction main() {\n    (new Helper())->run();\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/Service/Helper.php"),
+        "<?php\nnamespace App\\Service;\n\nclass Helper {\n    public function run() {}\n}\n",
+    )
+    .unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("php-psr4-lsp")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.php::") && e.src_qn.contains("::main@"))
+        .collect();
+    assert!(
+        main_calls
+            .iter()
+            .any(|e| e.dst_qn.contains("run") && e.dst_qn.starts_with("src/Service/Helper.php::")),
+        "expected PSR-4 CALLS to src/Service/Helper.run, got {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
 fn java_pipeline_resolves_imported_class_method_via_lsp_cross() {
     let (_guard, _cache, _) = isolated_cache();
     let dir = TempDir::new().unwrap();

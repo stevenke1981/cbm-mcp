@@ -3,6 +3,7 @@ use crate::pipeline::registry::{
     call_edge_properties_json, CallTargetKind, FileCallResolver, SymbolRegistry,
 };
 use crate::store::{Edge, Symbol};
+use std::path::Path;
 
 pub use crate::pipeline::registry::SymbolRegistry as Registry;
 
@@ -24,7 +25,18 @@ pub fn resolve_calls_with_registry(
     registry: &SymbolRegistry,
     caller_file: &str,
 ) -> Vec<Edge> {
-    let imports = ImportMap::parse(caller_file, language, content);
+    resolve_calls_with_registry_root(symbols, content, language, registry, caller_file, None)
+}
+
+pub fn resolve_calls_with_registry_root(
+    symbols: &[Symbol],
+    content: &str,
+    language: &str,
+    registry: &SymbolRegistry,
+    caller_file: &str,
+    repo_root: Option<&Path>,
+) -> Vec<Edge> {
+    let imports = ImportMap::parse_with_root(caller_file, language, content, repo_root);
     let mut resolver = FileCallResolver::new(registry, caller_file, imports);
 
     if matches!(
