@@ -45,5 +45,5 @@ echo -e "${GRAY}Running codebase-memory-mcp install...${NC}"
 
 echo ""
 echo -e "${GREEN}Done! Restart your coding agent.${NC}"
-echo -e "${GRAY}MCP server: cbm-mcp${NC}"
+echo -e "${GRAY}MCP server: codebase-memory-mcp${NC}"
 echo -e "${GRAY}Binary:     $BINARY${NC}"

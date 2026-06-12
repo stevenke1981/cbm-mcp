@@ -1,6 +1,4 @@
-use crate::error::{
-    Result, JSONRPC_INTERNAL_ERROR, JSONRPC_METHOD_NOT_FOUND, JSONRPC_PARSE_ERROR,
-};
+use crate::error::{Result, JSONRPC_INTERNAL_ERROR, JSONRPC_METHOD_NOT_FOUND, JSONRPC_PARSE_ERROR};
 use crate::mcp::tool_specs::tool_definitions;
 use crate::mcp::tools::ToolHandler;
 use crate::mcp::transport::{read_stdin_message, write_stdout_message};
@@ -136,16 +134,14 @@ impl McpServer {
                 "version": SERVER_VERSION
             },
             "instructions": format!(
-                "codebase-memory-mcp graph server. Index with index_repository, then search_graph / trace_path / query_graph. Git watcher: {watcher_on}. RLM tools live in codebase-memory-rlm-mcp (separate server)."
+                "codebase-memory-mcp graph server. Index with index_repository, then search_graph / trace_path / query_graph. Git watcher: {watcher_on}. RLM tools live in rlm-mcp (separate server)."
             )
         })
     }
 
     fn handle_tool_call(&self, request: &Value) -> Result<Value> {
         let params = request.get("params");
-        let name = params
-            .and_then(|p| p.get("name"))
-            .and_then(|v| v.as_str());
+        let name = params.and_then(|p| p.get("name")).and_then(|v| v.as_str());
         let Some(name) = name else {
             return Ok(tool_text_result("missing tool name", true));
         };
@@ -303,13 +299,11 @@ mod tests {
             value.pointer("/result/isError").and_then(|v| v.as_bool()),
             Some(true)
         );
-        assert!(
-            value
-                .pointer("/result/content/0/text")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .contains("unknown tool")
-        );
+        assert!(value
+            .pointer("/result/content/0/text")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .contains("unknown tool"));
     }
 
     #[test]
@@ -329,7 +323,9 @@ mod tests {
             Some(true)
         );
         assert_eq!(
-            value.pointer("/result/content/0/text").and_then(|v| v.as_str()),
+            value
+                .pointer("/result/content/0/text")
+                .and_then(|v| v.as_str()),
             Some("missing tool name")
         );
     }

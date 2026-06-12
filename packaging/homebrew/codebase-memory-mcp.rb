@@ -1,5 +1,5 @@
-class Cbrlm < Formula
-  desc "Codebase RLM Memory MCP — Rust knowledge graph server for AI coding agents"
+class CodebaseMemoryMcp < Formula
+  desc "Rust codebase knowledge graph MCP server for AI coding agents"
   homepage "https://github.com/stevenke1981/cbm-mcp"
   license "MIT"
   version "0.1.0"

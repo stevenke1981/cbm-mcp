@@ -6,7 +6,6 @@ use crate::mcp::{tool_definitions, ToolHandler};
 use crate::mcp::{McpServer, SERVER_NAME, SERVER_VERSION};
 use serde_json::Value;
 
-
 pub fn print_help() {
     eprintln!(
         r#"{SERVER_NAME} v{SERVER_VERSION} — codebase-memory-mcp (Rust)
@@ -33,7 +32,7 @@ HTTP UI:
 
 GRAPH WORKFLOW:
     index_repository → search_graph / trace_path / query_graph / get_architecture
-    For RLM map-reduce use separate codebase-memory-rlm-mcp server.
+    For RLM map-reduce use separate rlm-mcp server.
 
 COMPATIBLE AGENTS:
     OpenCode, Codex, Claude Code, Gemini CLI, Zed, Aider

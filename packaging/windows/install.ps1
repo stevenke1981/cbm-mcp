@@ -2,16 +2,16 @@
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/windows/install.ps1 | iex
-#   $env:CBRLM_VERSION = "v0.1.0"; .\packaging\windows\install.ps1
+#   $env:CBM_VERSION = "v0.1.0"; .\packaging\windows\install.ps1
 
 param(
-    [string]$Version = $(if ($env:CBRLM_VERSION) { $env:CBRLM_VERSION } else { "latest" }),
-    [string]$Repo = $(if ($env:CBRLM_REPO) { $env:CBRLM_REPO } else { "stevenke1981/cbm-mcp" })
+    [string]$Version = $(if ($env:CBM_VERSION) { $env:CBM_VERSION } elseif ($env:CBRLM_VERSION) { $env:CBRLM_VERSION } else { "latest" }),
+    [string]$Repo = $(if ($env:CBM_REPO) { $env:CBM_REPO } elseif ($env:CBRLM_REPO) { $env:CBRLM_REPO } else { "stevenke1981/cbm-mcp" })
 )
 
 $ErrorActionPreference = "Stop"
 
-$InstallDir = if ($env:CBRLM_INSTALL_DIR) { $env:CBRLM_INSTALL_DIR } else { "$env:LOCALAPPDATA\cbm-mcp\bin" }
+$InstallDir = if ($env:CBM_INSTALL_DIR) { $env:CBM_INSTALL_DIR } elseif ($env:CBRLM_INSTALL_DIR) { $env:CBRLM_INSTALL_DIR } else { "$env:LOCALAPPDATA\cbm-mcp\bin" }
 $Artifact = "cbm-mcp-windows-x64"
 $Archive = "$Artifact.zip"
 

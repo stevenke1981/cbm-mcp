@@ -24,7 +24,7 @@ Restart the target agent after install.
 | `opencode.json` | OpenCode `opencode.json` snippet |
 | `claude-settings.json` | Claude Code / Desktop settings |
 | `manifest.json` | Machine-readable package summary |
-| `dual-servers.example.json` | Optional second server: `codebase-memory-rlm-mcp` |
+| `dual-servers.example.json` | Optional second server: `rlm-mcp` |
 
 Replace `{{CBM_BINARY}}` with an absolute binary path.
 
@@ -47,7 +47,7 @@ Use graph tools before broad file search when a project is indexed.
 
 ## RLM (separate project)
 
-RLM session tools (`rlm_scan`, `rlm_peek`, `rlm_chunk`, `rlm_workflow`, …) live in **[rlm-mcp](https://github.com/stevenke1981/rlm-mcp)** as MCP server **`codebase-memory-rlm-mcp`**.
+RLM session tools (`rlm_scan`, `rlm_peek`, `rlm_chunk`, `rlm_workflow`, ...) live in **[rlm-mcp](https://github.com/stevenke1981/rlm-mcp)** as MCP server **`rlm-mcp`**.
 
 - Not bundled with this binary
 - No code dependency between repos

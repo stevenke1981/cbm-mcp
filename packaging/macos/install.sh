@@ -3,14 +3,14 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/macos/install.sh | bash
-#   CBRLM_VERSION=v0.1.0 ./packaging/macos/install.sh
+#   CBM_VERSION=v0.1.0 ./packaging/macos/install.sh
 
 set -euo pipefail
 
-REPO="${CBRLM_REPO:-stevenke1981/cbm-mcp}"
-VERSION="${CBRLM_VERSION:-latest}"
-INSTALL_DIR="${CBRLM_INSTALL_DIR:-$HOME/.local/bin}"
-CONFIG_DIR="${CBRLM_CONFIG_DIR:-$HOME/.config/cbm-mcp/bin}"
+REPO="${CBM_REPO:-${CBRLM_REPO:-stevenke1981/cbm-mcp}}"
+VERSION="${CBM_VERSION:-${CBRLM_VERSION:-latest}}"
+INSTALL_DIR="${CBM_INSTALL_DIR:-${CBRLM_INSTALL_DIR:-$HOME/.local/bin}}"
+CONFIG_DIR="${CBM_CONFIG_DIR:-${CBRLM_CONFIG_DIR:-$HOME/.config/cbm-mcp/bin}}"
 
 arch="$(uname -m)"
 case "$arch" in

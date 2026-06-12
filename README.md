@@ -2,14 +2,14 @@
 
 Independent Rust implementation of **[codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)** — knowledge-graph indexer and MCP server for AI coding agents.
 
-**RLM tools are not included.** For long-text map-reduce, use the separate **[codebase-memory-rlm-mcp](https://github.com/stevenke1981/rlm-mcp)** MCP server (independent project).
+**RLM tools are not included.** For long-text map-reduce, use the separate **[rlm-mcp](https://github.com/stevenke1981/rlm-mcp)** MCP server (independent project).
 
 ## Relationship to other repos
 
 | Path | MCP server | Role |
 |------|------------|------|
 | `D:\cbm-mcp` | `codebase-memory-mcp` | **This repo** — graph indexing, 14 MCP tools |
-| `D:\rlm-mcp` | `codebase-memory-rlm-mcp` | Standalone RLM sessions (scan/peek/chunk) |
+| `D:\rlm-mcp` | `rlm-mcp` | Standalone RLM sessions (scan/peek/chunk) |
 | `D:\cbm\cbrlm` | `cbrlm-mcp` (legacy) | Deprecated combined binary |
 
 The two servers are **not integrated** — enable both in the agent only if you want graph search **and** RLM sessions.
@@ -21,6 +21,45 @@ cd D:\cbm-mcp
 cargo build --release
 .\target\release\codebase-memory-mcp.exe --version
 ```
+
+## Install
+
+### From source checkout
+
+```powershell
+cd D:\cbm-mcp
+.\install.ps1 -AllAgents
+```
+
+This builds `target\release\codebase-memory-mcp.exe`, copies it to `%USERPROFILE%\.config\codebase-memory-mcp\bin\`, installs agent MCP config, and writes the session hooks.
+
+Unix:
+
+```bash
+./install.sh --all-agents
+```
+
+### From GitHub Release
+
+Windows:
+
+```powershell
+irm https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/windows/install.ps1 | iex
+```
+
+Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/linux/install.sh | bash
+```
+
+macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/macos/install.sh | bash
+```
+
+Release archives include the binary, `README.md`, `LICENSE`, and `mcp-templates/` for agent handoff.
 
 ### Index + search
 
@@ -36,7 +75,7 @@ codebase-memory-mcp
 # MCP server name: codebase-memory-mcp
 ```
 
-### Optional: with codebase-memory-rlm-mcp
+### Optional: with rlm-mcp
 
 Register **two independent** MCP servers when you need both graph and RLM:
 
@@ -48,9 +87,9 @@ Register **two independent** MCP servers when you need both graph and RLM:
       "command": ["codebase-memory-mcp"],
       "enabled": true
     },
-    "codebase-memory-rlm-mcp": {
+    "rlm-mcp": {
       "type": "local",
-      "command": ["codebase-memory-rlm-mcp"],
+      "command": ["rlm-mcp"],
       "enabled": true
     }
   }
@@ -77,3 +116,15 @@ Rust MVP toward full reference parity with `D:\_cbm-ref`. See [`TODO.md`](TODO.m
 | `CBM_SEMANTIC_ENABLED=1` | Enable semantic pass |
 
 Projects use `cbm+` prefix (legacy `cbrlm+` accepted).
+
+## Agent handoff
+
+Use [`packaging/mcp/`](packaging/mcp/) for ready templates:
+
+- `opencode.json`
+- `codex-config.toml`
+- `claude-settings.json`
+- `generic-mcp.json`
+- `manifest.json`
+
+Replace `{{CBM_BINARY}}` with the absolute path printed by `install.ps1` / `install.sh`, or use the stable installed binary path.

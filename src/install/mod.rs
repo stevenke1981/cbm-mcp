@@ -210,7 +210,9 @@ fn resolve_source_binary(override_path: Option<&Path>) -> Result<PathBuf> {
     if current.is_file() {
         return Ok(current);
     }
-    Err(Error::Other("could not resolve codebase-memory-mcp binary path".into()))
+    Err(Error::Other(
+        "could not resolve codebase-memory-mcp binary path".into(),
+    ))
 }
 
 fn install_binary(source: &Path, dest: &Path) -> Result<()> {
@@ -698,7 +700,8 @@ fn upsert_claude_hooks(settings_path: &Path, gate_cmd: &str, session_cmd: &str) 
                         .and_then(|h| h.get("command"))
                         .and_then(|c| c.as_str())
                         .unwrap_or("");
-                    !cmd.contains("cbrlm-code-discovery-gate")
+                    !cmd.contains("cbm-code-discovery-gate")
+                        && !cmd.contains("cbrlm-code-discovery-gate")
                 })
                 .cloned()
                 .collect()
@@ -728,7 +731,7 @@ fn upsert_claude_hooks(settings_path: &Path, gate_cmd: &str, session_cmd: &str) 
                         .and_then(|h| h.get("command"))
                         .and_then(|c| c.as_str())
                         .unwrap_or("");
-                    !cmd.contains("cbrlm-session-reminder")
+                    !cmd.contains("cbm-session-reminder") && !cmd.contains("cbrlm-session-reminder")
                 })
                 .cloned()
                 .collect()
@@ -791,7 +794,7 @@ fn remove_claude_hooks() -> Result<()> {
                 .and_then(|h| h.get("command"))
                 .and_then(|c| c.as_str())
                 .unwrap_or("");
-            !cmd.contains("cbrlm-code-discovery-gate")
+            !cmd.contains("cbm-code-discovery-gate") && !cmd.contains("cbrlm-code-discovery-gate")
         });
     }
     if let Some(session) = hooks.get_mut("SessionStart").and_then(|v| v.as_array_mut()) {
@@ -803,7 +806,7 @@ fn remove_claude_hooks() -> Result<()> {
                 .and_then(|h| h.get("command"))
                 .and_then(|c| c.as_str())
                 .unwrap_or("");
-            !cmd.contains("cbrlm-session-reminder")
+            !cmd.contains("cbm-session-reminder") && !cmd.contains("cbrlm-session-reminder")
         });
     }
     write_json_pretty(&path, &Value::Object(root))?;

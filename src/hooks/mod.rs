@@ -22,12 +22,12 @@ CRITICAL - Code Discovery Protocol (codebase-memory-mcp):
    - trace_path for call chains and data flow
    - get_code_snippet for exact symbol source
 2. Project names use cbm+ prefix (legacy cbrlm+ accepted).
-3. For huge logs / non-code blobs: use separate codebase-memory-rlm-mcp (rlm_scan, rlm_peek, rlm_chunk).
+3. For huge logs / non-code blobs: use separate rlm-mcp (rlm_scan, rlm_peek, rlm_chunk).
 4. Use Grep/Glob/Read for configs; always Read a file before editing it.
 5. If the project is not indexed yet, run index_repository FIRST.";
 
 pub const CODEX_SESSION_REMINDER_CMD: &str = "\
-echo \"Code discovery: prefer codebase-memory-mcp (search_graph, trace_path, get_code_snippet) over grep/file-read; projects use cbm+ prefix; run index_repository first if not indexed. For long logs use codebase-memory-rlm-mcp.\"";
+echo \"Code discovery: prefer codebase-memory-mcp (search_graph, trace_path, get_code_snippet) over grep/file-read; projects use cbm+ prefix; run index_repository first if not indexed. For long logs use rlm-mcp.\"";
 
 pub const CODEX_HOOK_BEGIN: &str = "# >>> codebase-memory-mcp SessionStart >>>";
 pub const CODEX_HOOK_END: &str = "# <<< codebase-memory-mcp SessionStart <<<";

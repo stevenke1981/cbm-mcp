@@ -1,6 +1,6 @@
 {
     "version": "0.1.0",
-    "description": "Codebase RLM Memory MCP — Rust knowledge graph server for AI coding agents",
+    "description": "Rust codebase knowledge graph MCP server for AI coding agents",
     "homepage": "https://github.com/stevenke1981/cbm-mcp",
     "license": "MIT",
     "architecture": {

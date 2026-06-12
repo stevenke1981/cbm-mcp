@@ -26,6 +26,15 @@ $License = Join-Path $Root "LICENSE"
 if (Test-Path $License) {
     Copy-Item $License $Stage
 }
+$Readme = Join-Path $Root "README.md"
+if (Test-Path $Readme) {
+    Copy-Item $Readme $Stage
+}
+$McpTemplates = Join-Path $Root "packaging\mcp"
+if (Test-Path $McpTemplates) {
+    Copy-Item $McpTemplates (Join-Path $Stage "mcp-templates") -Recurse
+}
+Set-Content -Path (Join-Path $Stage "RELEASE.txt") -Value "$ArtifactName"
 
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 $ZipPath = Join-Path $Dist "$ArtifactName.zip"

@@ -27,6 +27,13 @@ cp "$BINARY" "$STAGE/"
 if [ -f "$ROOT/LICENSE" ]; then
   cp "$ROOT/LICENSE" "$STAGE/"
 fi
+if [ -f "$ROOT/README.md" ]; then
+  cp "$ROOT/README.md" "$STAGE/"
+fi
+if [ -d "$ROOT/packaging/mcp" ]; then
+  cp -R "$ROOT/packaging/mcp" "$STAGE/mcp-templates"
+fi
+printf '%s\n' "$ARTIFACT" > "$STAGE/RELEASE.txt"
 
 mkdir -p "$DIST"
 OUT="$DIST/${ARTIFACT}.tar.gz"

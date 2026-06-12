@@ -1,12 +1,12 @@
 # winget manifest template — update PackageIdentifier and InstallerSha256 on release
-PackageIdentifier: CBRLM.CBRLM
+PackageIdentifier: CodebaseMemoryMcp.CodebaseMemoryMcp
 PackageVersion: 0.1.0
 PackageLocale: en-US
-Publisher: CBRLM Contributors
-PackageName: CBRLM
+Publisher: CodebaseMemoryMcp Contributors
+PackageName: codebase-memory-mcp
 PackageUrl: https://github.com/stevenke1981/cbm-mcp
 License: MIT
-ShortDescription: Codebase RLM Memory MCP server for AI coding agents
+ShortDescription: Rust codebase knowledge graph MCP server for AI coding agents
 Moniker: cbm-mcp
 Tags:
   - mcp
