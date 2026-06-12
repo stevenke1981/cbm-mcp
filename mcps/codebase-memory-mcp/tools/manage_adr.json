@@ -11,6 +11,13 @@
         ]
       },
       "mode": {
+        "enum": [
+          "get",
+          "update",
+          "store",
+          "sections",
+          "delete"
+        ],
         "type": [
           "string",
           "null"

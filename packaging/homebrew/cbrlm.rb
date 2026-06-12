@@ -1,37 +1,37 @@
 class Cbrlm < Formula
   desc "Codebase RLM Memory MCP — Rust knowledge graph server for AI coding agents"
-  homepage "https://github.com/cbrlm/cbrlm"
+  homepage "https://github.com/stevenke1981/cbm-mcp"
   license "MIT"
   version "0.1.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/cbrlm/cbrlm/releases/download/v#{version}/cbrlm-macos-arm64.tar.gz"
+      url "https://github.com/stevenke1981/cbm-mcp/releases/download/v#{version}/cbm-mcp-macos-arm64.tar.gz"
       sha256 "UPDATE_FROM_RELEASE_SHA256SUMS"
     end
     on_intel do
-      url "https://github.com/cbrlm/cbrlm/releases/download/v#{version}/cbrlm-macos-x64.tar.gz"
+      url "https://github.com/stevenke1981/cbm-mcp/releases/download/v#{version}/cbm-mcp-macos-x64.tar.gz"
       sha256 "UPDATE_FROM_RELEASE_SHA256SUMS"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/cbrlm/cbrlm/releases/download/v#{version}/cbrlm-linux-arm64.tar.gz"
+      url "https://github.com/stevenke1981/cbm-mcp/releases/download/v#{version}/cbm-mcp-linux-arm64.tar.gz"
       sha256 "UPDATE_FROM_RELEASE_SHA256SUMS"
     end
     on_intel do
-      url "https://github.com/cbrlm/cbrlm/releases/download/v#{version}/cbrlm-linux-x64.tar.gz"
+      url "https://github.com/stevenke1981/cbm-mcp/releases/download/v#{version}/cbm-mcp-linux-x64.tar.gz"
       sha256 "UPDATE_FROM_RELEASE_SHA256SUMS"
     end
   end
 
   def install
-    bin.install "cbrlm"
+    bin.install "codebase-memory-mcp"
   end
 
   def post_install
-    ohai "Run 'cbrlm install --yes --all' to configure MCP agents"
+    ohai "Run 'codebase-memory-mcp install --yes --all' to configure MCP agents"
   end
 
   livecheck do
@@ -41,12 +41,12 @@ class Cbrlm < Formula
 
   def caveats
     <<~EOS
-      Run `cbrlm install --yes --all` to register the MCP server with coding agents.
-      Optional graph UI: `cbrlm --ui --port 9749`
+      Run `codebase-memory-mcp install --yes --all` to register the MCP server with coding agents.
+      Optional graph UI: `codebase-memory-mcp --ui --port 9749`
     EOS
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/cbrlm --version")
+    assert_match version.to_s, shell_output("#{bin}/codebase-memory-mcp --version")
   end
 end

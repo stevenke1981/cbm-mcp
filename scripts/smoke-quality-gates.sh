@@ -29,10 +29,10 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
   cargo build --release
 fi
 
-if [[ -x "$ROOT/target/release/cbrlm" ]]; then
-  BIN="$ROOT/target/release/cbrlm"
-elif [[ -x "$ROOT/target/release/cbrlm.exe" ]]; then
-  BIN="$ROOT/target/release/cbrlm.exe"
+if [[ -x "$ROOT/target/release/codebase-memory-mcp" ]]; then
+  BIN="$ROOT/target/release/codebase-memory-mcp"
+elif [[ -x "$ROOT/target/release/codebase-memory-mcp.exe" ]]; then
+  BIN="$ROOT/target/release/codebase-memory-mcp.exe"
 else
   echo "release binary not found; omit --skip-build" >&2
   exit 1

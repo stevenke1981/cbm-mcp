@@ -249,29 +249,56 @@ impl ToolHandler {
 
     fn manage_adr(&self, args: &Value) -> Result<Value> {
         let project = normalize_project_name(Self::require_str(args, "project")?);
-        let action = args
+        let mode = args
             .get("mode")
             .or_else(|| args.get("action"))
             .and_then(|v| v.as_str())
             .unwrap_or("get");
         let store = Store::open(&project)?;
-        match action {
-            "set" => {
+        match mode {
+            "set" | "update" | "store" => {
                 let content = Self::require_str(args, "content")?;
                 store.set_adr(content)?;
-                Ok(json!({ "action": "set", "length": content.len() }))
+                Ok(json!({ "status": "updated" }))
             }
             "delete" => {
                 store.set_meta("adr", "")?;
-                Ok(json!({ "action": "delete" }))
+                Ok(json!({ "status": "deleted" }))
+            }
+            "sections" => {
+                let adr = store.get_adr()?;
+                let sections = adr_list_sections(adr.as_deref().unwrap_or(""));
+                Ok(json!({ "sections": sections }))
             }
             _ => {
                 let adr = store.get_adr()?;
-                Ok(json!({ "action": "get", "content": adr }))
+                if let Some(content) = adr.filter(|c| !c.is_empty()) {
+                    Ok(json!({ "content": content }))
+                } else {
+                    Ok(json!({
+                        "content": "",
+                        "status": "no_adr",
+                        "adr_hint": ADR_EMPTY_HINT
+                    }))
+                }
             }
         }
     }
 
+}
+
+const ADR_EMPTY_HINT: &str = "No ADR yet. Create one with manage_adr(mode='update', \
+content='## PURPOSE\\n...\\n\\n## STACK\\n...\\n\\n## ARCHITECTURE\\n...\\n\\n## PATTERNS\\n...\\n\\n## TRADEOFFS\\n...\\n\\n## PHILOSOPHY\\n...'). \
+For guided creation: explore the codebase with get_architecture, then draft and store. \
+Sections: PURPOSE, STACK, ARCHITECTURE, PATTERNS, TRADEOFFS, PHILOSOPHY.";
+
+fn adr_list_sections(content: &str) -> Vec<String> {
+    content
+        .lines()
+        .map(|line| line.trim_end_matches('\r'))
+        .filter(|line| line.starts_with('#'))
+        .map(str::to_string)
+        .collect()
 }
 
 fn parse_search_filter(args: &Value) -> SearchFilter {

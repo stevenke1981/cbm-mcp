@@ -1,4 +1,4 @@
-# Package a built cbrlm binary into a release zip.
+# Package a built codebase-memory-mcp binary into a release zip.
 # Usage: .\scripts\package-artifact.ps1 <artifact-name> <binary-path>
 
 param(

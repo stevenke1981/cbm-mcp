@@ -18,7 +18,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 - [~] Flags: `--ui`, `--port` (default 9749), `--profile`
 - [~] Graceful shutdown: SIGINT/Ctrl+C, watcher + HTTP stop
 - [ ] Parent process watchdog (POSIX reference only)
-- [x] Project naming from path hash slug (`cbrlm+` style)
+- [x] Project naming from path hash slug (`cbm+` style)
 - [x] Cache dir env (`CBM_CACHE_DIR` / compatibility aliases)
 
 ## 2. MCP protocol (`specifications.md` §3, `functions.md` §1.2)
@@ -88,7 +88,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 ### Tool: `manage_adr`
 
 - [x] List/create/update ADR entries
-- [ ] `manage_adr_sections` — separate tool vs `manage_adr` alias (decision pending)
+- [x] `manage_adr` mode=sections (reference alias; no separate `manage_adr_sections` tool)
 
 ### Tool: `ingest_traces`
 

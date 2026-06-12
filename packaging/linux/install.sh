@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Install cbrlm from GitHub Release (Linux x64 / arm64).
+# Install cbm-mcp from GitHub Release (Linux x64 / arm64).
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cbrlm/cbrlm/main/packaging/linux/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/linux/install.sh | bash
 #   CBRLM_VERSION=v0.1.0 ./packaging/linux/install.sh
 
 set -euo pipefail
 
-REPO="${CBRLM_REPO:-cbrlm/cbrlm}"
+REPO="${CBRLM_REPO:-stevenke1981/cbm-mcp}"
 VERSION="${CBRLM_VERSION:-latest}"
 INSTALL_DIR="${CBRLM_INSTALL_DIR:-$HOME/.local/bin}"
-CONFIG_DIR="${CBRLM_CONFIG_DIR:-$HOME/.config/cbrlm/bin}"
+CONFIG_DIR="${CBRLM_CONFIG_DIR:-$HOME/.config/cbm-mcp/bin}"
 
 arch="$(uname -m)"
 case "$arch" in
-  x86_64|amd64) ARTIFACT="cbrlm-linux-x64" ;;
-  aarch64|arm64) ARTIFACT="cbrlm-linux-arm64" ;;
+  x86_64|amd64) ARTIFACT="cbm-mcp-linux-x64" ;;
+  aarch64|arm64) ARTIFACT="cbm-mcp-linux-arm64" ;;
   *)
     echo "Unsupported Linux architecture: $arch" >&2
     exit 1
@@ -54,18 +54,18 @@ fi
 tar -xzf "$TMP/${ARCHIVE}" -C "$TMP"
 
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR"
-install -m 755 "$TMP/cbrlm" "$CONFIG_DIR/cbrlm"
-ln -sf "$CONFIG_DIR/cbrlm" "$INSTALL_DIR/cbrlm"
+install -m 755 "$TMP/codebase-memory-mcp" "$CONFIG_DIR/codebase-memory-mcp"
+ln -sf "$CONFIG_DIR/codebase-memory-mcp" "$INSTALL_DIR/codebase-memory-mcp"
 
 if ! echo ":$PATH:" | grep -q ":${INSTALL_DIR}:"; then
   echo ""
   echo "Add to PATH: export PATH=\"${INSTALL_DIR}:\$PATH\""
 fi
 
-if command -v cbrlm >/dev/null 2>&1; then
+if command -v codebase-memory-mcp >/dev/null 2>&1; then
   echo "Configuring MCP agents..."
-  cbrlm install --yes --all || true
+  codebase-memory-mcp install --yes --all || true
 fi
 
 echo ""
-echo "Installed cbrlm ${VERSION} → ${CONFIG_DIR}/cbrlm"
+echo "Installed codebase-memory-mcp ${VERSION} → ${CONFIG_DIR}/codebase-memory-mcp"

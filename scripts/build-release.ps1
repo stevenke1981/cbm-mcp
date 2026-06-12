@@ -34,21 +34,21 @@ if ($LASTEXITCODE -ne 0) { throw "cargo test failed" }
 
 function Get-ArtifactName([string]$Target) {
     switch ($Target) {
-        "x86_64-pc-windows-msvc" { "cbrlm-windows-x64" }
-        "aarch64-pc-windows-msvc" { "cbrlm-windows-arm64" }
-        "x86_64-unknown-linux-gnu" { "cbrlm-linux-x64" }
-        "aarch64-unknown-linux-gnu" { "cbrlm-linux-arm64" }
-        "aarch64-apple-darwin" { "cbrlm-macos-arm64" }
-        "x86_64-apple-darwin" { "cbrlm-macos-x64" }
-        default { "cbrlm-$Target" }
+        "x86_64-pc-windows-msvc" { "cbm-mcp-windows-x64" }
+        "aarch64-pc-windows-msvc" { "cbm-mcp-windows-arm64" }
+        "x86_64-unknown-linux-gnu" { "cbm-mcp-linux-x64" }
+        "aarch64-unknown-linux-gnu" { "cbm-mcp-linux-arm64" }
+        "aarch64-apple-darwin" { "cbm-mcp-macos-arm64" }
+        "x86_64-apple-darwin" { "cbm-mcp-macos-x64" }
+        default { "cbm-mcp-$Target" }
     }
 }
 
 function Get-BinaryPath([string]$Target) {
     if ($Target -like "*windows*") {
-        return Join-Path $Root "target\$Target\release\cbrlm.exe"
+        return Join-Path $Root "target\$Target\release\codebase-memory-mcp.exe"
     }
-    return Join-Path $Root "target\$Target\release\cbrlm"
+    return Join-Path $Root "target\$Target\release\codebase-memory-mcp"
 }
 
 function Build-Target([string]$Target) {

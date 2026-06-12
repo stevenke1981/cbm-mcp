@@ -9,14 +9,14 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 | MCP server name | `codebase-memory-mcp` | Done |
 | Graph tools (14) | Implemented (MVP/heuristic) | [`PARITY_MATRIX.md`](PARITY_MATRIX.md) |
 | RLM tools | **Out of scope** → [`rlm-mcp`](../rlm-mcp) | [`SEPARATION.md`](../cbm/SEPARATION.md) |
-| Agent packaging | Templates + installer (partial `cbrlm` legacy names in install code) | `packaging/mcp/` |
+| Agent packaging | Templates + installer (`cbm-mcp` / `codebase-memory-mcp` naming) | `packaging/mcp/` |
 | Reference parity | **Not complete** — SQLite MVP, partial CALLS/semantic | P0–P3 below |
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** LSP subprocess cross-file · `manage_adr_sections` decision · MCP process-level smoke.
+**Next P0 slices:** LSP subprocess cross-file · MCP process-level smoke.
 
-**Done recently:** `SymbolRegistry` + import-map CALLS · `GraphBuffer` staging (`graph_buffer.rs`).
+**Done recently:** `manage_adr` mode=sections · project rename `cbm-mcp` · `SymbolRegistry` + import-map CALLS · `GraphBuffer` staging.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -85,7 +85,7 @@ Acceptance criteria:
   - pagination semantics
   - error messages/categories
   - response fields
-- [ ] Decide whether `manage_adr_sections` from the reference docs is a separate tool or alias of `manage_adr`; implement or document the deviation.
+- [ ] Decide whether ``manage_adr` mode=sections implemented (reference uses mode, not separate tool).
 - [ ] Add process-level MCP inspector smoke for `tools/list` and at least one `tools/call`.
 
 Acceptance criteria:

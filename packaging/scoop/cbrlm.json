@@ -1,24 +1,24 @@
 {
     "version": "0.1.0",
     "description": "Codebase RLM Memory MCP — Rust knowledge graph server for AI coding agents",
-    "homepage": "https://github.com/cbrlm/cbrlm",
+    "homepage": "https://github.com/stevenke1981/cbm-mcp",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/cbrlm/cbrlm/releases/download/v0.1.0/cbrlm-windows-x64.zip",
+            "url": "https://github.com/stevenke1981/cbm-mcp/releases/download/v0.1.0/cbm-mcp-windows-x64.zip",
             "hash": "sha256:UPDATE_FROM_RELEASE_SHA256SUMS"
         }
     },
-    "bin": "cbrlm.exe",
+    "bin": "codebase-memory-mcp.exe",
     "checkver": {
-        "github": "https://github.com/cbrlm/cbrlm"
+        "github": "https://github.com/stevenke1981/cbm-mcp"
     },
     "autoupdate": {
         "architecture": {
             "64bit": {
-                "url": "https://github.com/cbrlm/cbrlm/releases/download/v$version/cbrlm-windows-x64.zip"
+                "url": "https://github.com/stevenke1981/cbm-mcp/releases/download/v$version/cbm-mcp-windows-x64.zip"
             }
         }
     },
-    "notes": "Run 'cbrlm install --yes --all' after install to configure MCP agents. Linux/macOS: see packaging/linux/install.sh and packaging/macos/install.sh"
+    "notes": "Run 'codebase-memory-mcp install --yes --all' after install to configure MCP agents. Linux/macOS: see packaging/linux/install.sh and packaging/macos/install.sh"
 }

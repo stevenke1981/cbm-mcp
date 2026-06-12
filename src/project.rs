@@ -32,12 +32,14 @@ pub fn project_name_from_path(repo_path: &Path) -> String {
 }
 
 pub fn default_cache_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("CBRLM_CACHE_DIR") {
-        return PathBuf::from(dir);
+    for key in ["CBM_CACHE_DIR", "CBRLM_CACHE_DIR"] {
+        if let Ok(dir) = std::env::var(key) {
+            return PathBuf::from(dir);
+        }
     }
     dirs::cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("cbrlm-mcp")
+        .join("cbm-mcp")
 }
 
 pub fn project_db_path(project: &str) -> PathBuf {

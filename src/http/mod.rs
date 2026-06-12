@@ -61,7 +61,7 @@ impl HttpServer {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .worker_threads(2)
-                .thread_name("cbrlm-http")
+                .thread_name("cbm-mcp-http")
                 .build()
                 .expect("tokio runtime");
 
@@ -135,7 +135,7 @@ async fn index() -> Html<&'static str> {
 }
 
 async fn api_health() -> impl IntoResponse {
-    Json(serde_json::json!({ "status": "ok", "server": "cbrlm-ui" }))
+    Json(serde_json::json!({ "status": "ok", "server": "cbm-mcp-ui" }))
 }
 
 async fn api_projects() -> impl IntoResponse {

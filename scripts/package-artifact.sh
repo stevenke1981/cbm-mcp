@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Package a built cbrlm binary into a release archive.
+# Package a built codebase-memory-mcp binary into a release archive.
 # Usage: ./scripts/package-artifact.sh <artifact-name> <binary-path>
-# Example: ./scripts/package-artifact.sh cbrlm-linux-x64 target/x86_64-unknown-linux-gnu/release/cbrlm
+# Example: ./scripts/package-artifact.sh cbm-mcp-linux-x64 target/x86_64-unknown-linux-gnu/release/codebase-memory-mcp
 
 set -euo pipefail
 

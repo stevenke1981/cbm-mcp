@@ -184,7 +184,7 @@ fn query_project(dir: &Path, token: &str) -> QueryOutcome {
 
 fn format_context(hits: &[crate::store::Symbol], token: &str) -> String {
     let mut text = format!(
-        "[cbrlm] {} graph symbol(s) match \"{}\" \
+        "[cbm-mcp] {} graph symbol(s) match \"{}\" \
          (structured context; your search results below are unaffected):",
         hits.len(),
         token

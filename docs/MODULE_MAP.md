@@ -37,7 +37,7 @@
 | `src/traces/` | Runtime trace ingest | `src/mcp/tools.rs` (`ingest_traces`) | MVP | |
 | `src/ui/` + `graph-ui/` | HTTP + React 3D UI | `src/http/` | MVP | Embedded HTML UI; no React/Three.js port |
 | `internal/cbm/` | Tree-sitter + extract + LSP | `src/pipeline/*`, `internal/` N/A | Partial | See [internal/cbm](#internalcbm-tree-sitter--extractors) |
-| `pkg/*` | Go/Python/npm/Homebrew… | `src/install/` | Partial | Installer templates; legacy `cbrlm` names remain |
+| `pkg/*` | Go/Python/npm/Homebrew… | `src/install/` | Partial | Installer templates; legacy naming cleaned names remain |
 | `scripts/` | Build, bench, security | `scripts/` | Partial | Quality-gate smokes; no benchmark CI |
 | `test-infrastructure/` | Docker bench env | `tests/fixtures/` | Partial | Fixture repos; no docker bench |
 | `vendored/` | sqlite3, yyjson, tre, mongoose… | `Cargo.toml` deps | Partial | Rust crates replace most vendored C |
@@ -69,7 +69,7 @@
 | Tool handlers (14 graph) | `mcp/tools.rs` | Partial |
 | Store cache / evict idle | `mcp/server.rs` | Partial |
 | `target_projects` arg | `index_repository` + `cross_repo.rs` | **Partial** — `mode=cross-repo-intelligence` MVP |
-| `manage_adr_sections` | docs only | **Missing** — merged into `manage_adr` or TBD |
+| `manage_adr_sections` | docs only | **Alias** — `manage_adr` mode=sections (no separate tool) |
 
 Checked-in tool schemas: `mcps/codebase-memory-mcp/tools/*.json` (snapshot-tested).
 
@@ -310,7 +310,7 @@ Aligned with [`TODO.md`](../TODO.md) P0:
 2. **Graph buffer staging** — `src/graph_buffer/`
 3. **Usages / TypeRef pass** — `pass_usages.c`, `extract_type_refs.c`
 4. **`target_projects`** — wire `index_repository` handler to spec
-5. **`manage_adr_sections`** — implement or document as `manage_adr` alias
+5. ~~**`manage_adr_sections`**~~ — `manage_adr` mode=sections (done)
 6. **Read-only store + integrity gate** — release smoke
 7. **Grammar expansion** — track per-language in `PARITY_MATRIX.md`
 

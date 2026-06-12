@@ -190,6 +190,92 @@ fn mcp_tools_call_index_and_search() {
 }
 
 #[test]
+fn manage_adr_sections_update_and_get() {
+    let (_guard, _cache, _) = isolated_cache();
+    std::env::set_var("CBRLM_WATCHER", "0");
+    let dir = fixture_repo();
+    let server = McpServer::new();
+    let project = "adr-test";
+
+    let index_req = json!({
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "tools/call",
+        "params": {
+            "name": "index_repository",
+            "arguments": {
+                "repo_path": dir.path().to_string_lossy(),
+                "project": project,
+                "mode": "fast",
+                "persistence": false
+            }
+        }
+    });
+    server
+        .handle_message(&index_req.to_string())
+        .unwrap()
+        .unwrap();
+
+    let update_req = json!({
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "tools/call",
+        "params": {
+            "name": "manage_adr",
+            "arguments": {
+                "project": project,
+                "mode": "update",
+                "content": "## PURPOSE\nTest ADR\n\n## STACK\nRust\n"
+            }
+        }
+    });
+    let update_resp = server
+        .handle_message(&update_req.to_string())
+        .unwrap()
+        .unwrap();
+    assert!(update_resp.contains("updated"));
+
+    let sections_req = json!({
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "tools/call",
+        "params": {
+            "name": "manage_adr",
+            "arguments": {
+                "project": project,
+                "mode": "sections"
+            }
+        }
+    });
+    let sections_resp = server
+        .handle_message(&sections_req.to_string())
+        .unwrap()
+        .unwrap();
+    assert!(sections_resp.contains("## PURPOSE"));
+    assert!(sections_resp.contains("## STACK"));
+
+    let get_req = json!({
+        "jsonrpc": "2.0",
+        "id": 23,
+        "method": "tools/call",
+        "params": {
+            "name": "manage_adr",
+            "arguments": {
+                "project": project,
+                "mode": "get"
+            }
+        }
+    });
+    let get_resp = server
+        .handle_message(&get_req.to_string())
+        .unwrap()
+        .unwrap();
+    assert!(get_resp.contains("Test ADR"));
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&normalize_project_name(project));
+}
+
+#[test]
 fn ingest_runtime_traces() {
     let (_guard, _cache, _) = isolated_cache();
     let dir = fixture_repo();

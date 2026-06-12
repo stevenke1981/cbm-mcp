@@ -138,7 +138,7 @@ pub fn run_uninstall(opts: &UninstallOptions) -> Result<UninstallReport> {
     let mut removed = Vec::new();
     let mut skipped = Vec::new();
 
-    if !opts.yes && !opts.dry_run && !confirm("uninstall cbrlm-mcp integration?")? {
+    if !opts.yes && !opts.dry_run && !confirm("uninstall cbm-mcp integration?")? {
         eprintln!("cancelled");
         return Ok(UninstallReport { removed, skipped });
     }
@@ -210,7 +210,7 @@ fn resolve_source_binary(override_path: Option<&Path>) -> Result<PathBuf> {
     if current.is_file() {
         return Ok(current);
     }
-    Err(Error::Other("could not resolve cbrlm binary path".into()))
+    Err(Error::Other("could not resolve codebase-memory-mcp binary path".into()))
 }
 
 fn install_binary(source: &Path, dest: &Path) -> Result<()> {
@@ -310,7 +310,7 @@ fn all_targets() -> Vec<AgentTarget> {
         },
         AgentTarget {
             kind: AgentKind::Unknown,
-            config_path: ".config/cbrlm/mcp.json",
+            config_path: ".config/cbm-mcp/mcp.json",
             format: ConfigFormat::FallbackJson,
             create_if_missing: true,
         },
@@ -395,7 +395,9 @@ fn confirm(prompt: &str) -> Result<bool> {
 
 fn mcp_env(agent: AgentKind) -> Map<String, Value> {
     let mut env = Map::new();
-    env.insert("CBRLM_PROJECT_PREFIX".into(), json!("cbrlm+"));
+    env.insert("CBM_PROJECT_PREFIX".into(), json!("cbm+"));
+    env.insert("CBM_AGENT".into(), json!(agent.slug()));
+    env.insert("CBRLM_PROJECT_PREFIX".into(), json!("cbm+"));
     env.insert("CBRLM_AGENT".into(), json!(agent.slug()));
     env
 }
@@ -523,7 +525,8 @@ fn write_codex_config(path: &Path, binary: &Path, agent: AgentKind) -> Result<bo
     let section_header = format!("[mcp_servers.{MCP_SERVER_NAME}]");
     let bin = binary.to_string_lossy().replace('\\', "/");
     let block = format!(
-        "\n{section_header}\ncommand = \"{bin}\"\nargs = []\n\n[mcp_servers.{MCP_SERVER_NAME}.env]\nCBRLM_PROJECT_PREFIX = \"cbrlm+\"\nCBRLM_AGENT = \"{}\"\n",
+        "\n{section_header}\ncommand = \"{bin}\"\nargs = []\n\n[mcp_servers.{MCP_SERVER_NAME}.env]\nCBM_PROJECT_PREFIX = \"cbm+\"\nCBM_AGENT = \"{}\"\nCBRLM_PROJECT_PREFIX = \"cbm+\"\nCBRLM_AGENT = \"{}\"\n",
+        agent.slug(),
         agent.slug()
     );
     let content = content.trim_end().to_string() + &block;
@@ -994,7 +997,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let cfg = dir.path().join("opencode.jsonc");
         fs::write(&cfg, r#"{"model":"test"}"#).unwrap();
-        let bin = dir.path().join("cbrlm.exe");
+        let bin = dir.path().join("codebase-memory-mcp.exe");
         fs::write(&bin, b"").unwrap();
 
         write_opencode_config(&cfg, &bin, AgentKind::OpenCode).unwrap();
@@ -1014,7 +1017,7 @@ mod tests {
   "mcp": {
     "cbm": {
       "type": "local",
-      "command": ["C:\\repo\\target\\release\\cbrlm.exe"],
+      "command": ["C:\\repo\\target\\release\\codebase-memory-mcp.exe"],
       "enabled": true,
       "timeout": 120000
     }
@@ -1022,7 +1025,7 @@ mod tests {
 }"#,
         )
         .unwrap();
-        let bin = dir.path().join("stable").join("cbrlm.exe");
+        let bin = dir.path().join("stable").join("codebase-memory-mcp.exe");
         fs::create_dir_all(bin.parent().unwrap()).unwrap();
         fs::write(&bin, b"").unwrap();
 
@@ -1057,12 +1060,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let cfg = dir.path().join("config.toml");
         fs::write(&cfg, "model = \"gpt\"\n").unwrap();
-        let bin = dir.path().join("cbrlm");
+        let bin = dir.path().join("codebase-memory-mcp");
         fs::write(&bin, b"").unwrap();
 
         write_codex_config(&cfg, &bin, AgentKind::Codex).unwrap();
         let text = fs::read_to_string(&cfg).unwrap();
         assert!(text.contains(&format!("[mcp_servers.{MCP_SERVER_NAME}]")));
+        assert!(text.contains("CBM_PROJECT_PREFIX"));
         assert!(text.contains("CBRLM_PROJECT_PREFIX"));
         assert!(text.contains("model = \"gpt\""));
     }
@@ -1072,7 +1076,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let cfg = dir.path().join("settings.json");
         fs::write(&cfg, r#"{"hooks":{}}"#).unwrap();
-        let bin = dir.path().join("cbrlm.exe");
+        let bin = dir.path().join("codebase-memory-mcp.exe");
         fs::write(&bin, b"").unwrap();
 
         write_mcp_servers_json(&cfg, &bin, AgentKind::ClaudeCode).unwrap();

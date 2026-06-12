@@ -76,32 +76,32 @@ artifact_name() {
         x86_64|amd64) arch="x64" ;;
         aarch64|arm64) arch="arm64" ;;
       esac
-      echo "cbrlm-${os}-${arch}"
+      echo "cbm-mcp-${os}-${arch}"
       ;;
-    x86_64-unknown-linux-gnu) echo "cbrlm-linux-x64" ;;
-    aarch64-unknown-linux-gnu) echo "cbrlm-linux-arm64" ;;
-    aarch64-unknown-linux-musl) echo "cbrlm-linux-arm64-musl" ;;
-    x86_64-pc-windows-msvc) echo "cbrlm-windows-x64" ;;
-    aarch64-apple-darwin) echo "cbrlm-macos-arm64" ;;
-    x86_64-apple-darwin) echo "cbrlm-macos-x64" ;;
-    *) echo "cbrlm-$1" ;;
+    x86_64-unknown-linux-gnu) echo "cbm-mcp-linux-x64" ;;
+    aarch64-unknown-linux-gnu) echo "cbm-mcp-linux-arm64" ;;
+    aarch64-unknown-linux-musl) echo "cbm-mcp-linux-arm64-musl" ;;
+    x86_64-pc-windows-msvc) echo "cbm-mcp-windows-x64" ;;
+    aarch64-apple-darwin) echo "cbm-mcp-macos-arm64" ;;
+    x86_64-apple-darwin) echo "cbm-mcp-macos-x64" ;;
+    *) echo "cbm-mcp-$1" ;;
   esac
 }
 
 binary_path() {
   local target="$1"
   if [ "$target" = "native" ]; then
-    if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -f "$ROOT/target/release/cbrlm.exe" ]; then
-      echo "$ROOT/target/release/cbrlm.exe"
+    if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -f "$ROOT/target/release/codebase-memory-mcp.exe" ]; then
+      echo "$ROOT/target/release/codebase-memory-mcp.exe"
     else
-      echo "$ROOT/target/release/cbrlm"
+      echo "$ROOT/target/release/codebase-memory-mcp"
     fi
     return
   fi
   if [[ "$target" == *"windows"* ]]; then
-    echo "$ROOT/target/$target/release/cbrlm.exe"
+    echo "$ROOT/target/$target/release/codebase-memory-mcp.exe"
   else
-    echo "$ROOT/target/$target/release/cbrlm"
+    echo "$ROOT/target/$target/release/codebase-memory-mcp"
   fi
 }
 

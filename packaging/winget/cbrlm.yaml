@@ -4,10 +4,10 @@ PackageVersion: 0.1.0
 PackageLocale: en-US
 Publisher: CBRLM Contributors
 PackageName: CBRLM
-PackageUrl: https://github.com/cbrlm/cbrlm
+PackageUrl: https://github.com/stevenke1981/cbm-mcp
 License: MIT
 ShortDescription: Codebase RLM Memory MCP server for AI coding agents
-Moniker: cbrlm
+Moniker: cbm-mcp
 Tags:
   - mcp
   - codebase
@@ -15,11 +15,11 @@ Tags:
 Installers:
   - Architecture: x64
     InstallerType: zip
-    InstallerUrl: https://github.com/cbrlm/cbrlm/releases/download/v0.1.0/cbrlm-windows-x64.zip
+    InstallerUrl: https://github.com/stevenke1981/cbm-mcp/releases/download/v0.1.0/cbm-mcp-windows-x64.zip
     InstallerSha256: PLACEHOLDER
     NestedInstallerType: portable
     NestedInstallerFiles:
-      - RelativeFilePath: cbrlm.exe
-        PortableCommandAlias: cbrlm
+      - RelativeFilePath: codebase-memory-mcp.exe
+        PortableCommandAlias: codebase-memory-mcp
 ManifestType: singleton
 ManifestVersion: 1.6.0

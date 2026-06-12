@@ -213,7 +213,7 @@ pub fn run_config(action: &str) -> Result<()> {
             );
         }
         _ => {
-            eprintln!("Usage: cbrlm config <list|snippet>");
+            eprintln!("Usage: codebase-memory-mcp config <list|snippet>");
         }
     }
     Ok(())
@@ -254,7 +254,7 @@ pub fn run_mcp_server(ui_config: UiConfig) -> Result<()> {
         server.stop();
     }
     if shutdown.is_triggered() {
-        eprintln!("cbrlm shutdown complete");
+        eprintln!("codebase-memory-mcp shutdown complete");
     } else if ui_config.enabled {
         if let Some(ref mut server) = http {
             eprintln!("MCP stdin closed; graph UI still running (Ctrl+C to exit)");

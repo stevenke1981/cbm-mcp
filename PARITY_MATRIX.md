@@ -22,12 +22,12 @@ Last updated: 2026-06-12 (Section 7 review applied).
 | Feature | Reference | Rust (`codebase-memory-mcp`) | Status |
 |---------|-----------|----------------|--------|
 | MCP stdio server | Yes | Yes | Done |
-| CLI tool dispatch | Yes | Yes (`cbrlm cli --json --quiet`) | Done |
+| CLI tool dispatch | Yes | Yes (`codebase-memory-mcp cli --json --quiet`) | Done |
 | Agent install/uninstall | Yes | Yes (OpenCode, Codex, Claude, …) | Done |
 | Hooks (augment, session-start) | Yes | Yes | Done |
 | SQLite graph store | Yes | Yes | Done |
 | Compressed artifact persistence | Yes | Yes (`.codebase-memory/graph.db.zst`) | Done |
-| Project naming (`cbrlm+` prefix) | Yes | Yes (path hash slug) | Done |
+| Project naming (`cbm+` prefix) | Yes | Yes (path hash slug; legacy `cbrlm+` accepted) | Done |
 | HTTP graph UI | Yes | Yes (search, node details, edge filters) | MVP |
 | Watcher / auto-reindex | Yes | Yes (backoff + dirty signature) | Done |
 | Graceful shutdown / cancel | Yes | Ctrl+C stops watcher/HTTP | MVP |
