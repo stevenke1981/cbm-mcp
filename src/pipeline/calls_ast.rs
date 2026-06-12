@@ -212,6 +212,28 @@ fn is_noise_callee(language: &str, name: &str) -> bool {
     }
 }
 
+fn push_edge(
+    edges: &mut Vec<Edge>,
+    seen: &mut std::collections::HashSet<(String, String)>,
+    caller: &Symbol,
+    callee: &str,
+    res: &CallResolution,
+    method: &str,
+) {
+    if res.qn == caller.qualified_name {
+        return;
+    }
+    let key = (caller.qualified_name.clone(), res.qn.clone());
+    if seen.insert(key) {
+        edges.push(Edge {
+            src_qn: caller.qualified_name.clone(),
+            dst_qn: res.qn.clone(),
+            edge_type: "CALLS".into(),
+            properties_json: Some(call_edge_properties_json(callee, res, method)),
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,27 +297,5 @@ mod tests {
         let mut resolver = FileCallResolver::new(&registry, "App.cs", imports);
         let edges = resolve_calls_ast("csharp", &symbols, src, &mut resolver);
         assert!(!edges.is_empty(), "expected AST edges; symbols={symbols:?}");
-    }
-}
-
-fn push_edge(
-    edges: &mut Vec<Edge>,
-    seen: &mut std::collections::HashSet<(String, String)>,
-    caller: &Symbol,
-    callee: &str,
-    res: &CallResolution,
-    method: &str,
-) {
-    if res.qn == caller.qualified_name {
-        return;
-    }
-    let key = (caller.qualified_name.clone(), res.qn.clone());
-    if seen.insert(key) {
-        edges.push(Edge {
-            src_qn: caller.qualified_name.clone(),
-            dst_qn: res.qn.clone(),
-            edge_type: "CALLS".into(),
-            properties_json: Some(call_edge_properties_json(callee, res, method)),
-        });
     }
 }

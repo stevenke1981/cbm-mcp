@@ -36,11 +36,15 @@ impl GraphBuffer {
         let qn = sym.qualified_name.clone();
         let name = sym.name.clone();
         let label = sym.label.clone();
-        if self.symbols.contains_key(&qn) {
-            self.symbols.insert(qn, sym);
-            return;
+        match self.symbols.entry(qn.clone()) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                entry.insert(sym);
+                return;
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(sym);
+            }
         }
-        self.symbols.insert(qn.clone(), sym);
         self.by_name.entry(name).or_default().push(qn.clone());
         let _ = label;
     }

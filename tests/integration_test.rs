@@ -7,7 +7,6 @@ use codebase_memory_mcp::project::normalize_project_name;
 use codebase_memory_mcp::store::{SearchFilter, Store};
 use serde_json::json;
 use std::fs;
-use std::sync::Arc;
 use support::isolated_cache;
 use tempfile::TempDir;
 

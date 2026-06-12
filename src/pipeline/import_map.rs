@@ -442,7 +442,7 @@ fn parse_composer_psr4(
         let base = normalize_path(&base_path.to_string_lossy());
         entries.push((norm_prefix, base));
     }
-    entries.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.0.len()));
     entries
 }
 

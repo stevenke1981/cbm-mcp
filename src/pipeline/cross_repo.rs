@@ -72,13 +72,13 @@ pub fn resolve_target_projects(source: &str, targets: &[String]) -> Result<Vec<S
         Ok(Store::list_projects()?
             .into_iter()
             .map(|p| p.name)
-            .filter(|name| name != source)
+            .filter(|name| name.as_str() != source)
             .collect())
     } else {
         Ok(targets
             .iter()
+            .filter(|name| name.as_str() != source)
             .cloned()
-            .filter(|name| name != source)
             .collect())
     }
 }
@@ -195,7 +195,7 @@ fn route_path_from_qn(qn: &str) -> Option<String> {
     qn.split("::Route::")
         .nth(1)
         .and_then(|rest| rest.split('@').next())
-        .map(|p| normalize_route_path(p))
+        .map(normalize_route_path)
 }
 
 fn collect_outbound_http_paths(store: &Store) -> Result<Vec<(String, String)>> {

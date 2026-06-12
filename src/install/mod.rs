@@ -756,6 +756,7 @@ fn upsert_claude_hooks(settings_path: &Path, gate_cmd: &str, session_cmd: &str) 
     Ok(())
 }
 
+#[allow(dead_code)]
 fn upsert_codex_session_hooks(config_path: &Path) -> Result<()> {
     let mut content = fs::read_to_string(config_path)?;
     let block = format!(

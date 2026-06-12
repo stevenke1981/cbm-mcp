@@ -190,9 +190,9 @@ impl SymbolRegistry {
 
         // Strategy 3: globally unique name.
         if candidates.len() == 1 {
-            let conf = if imports.is_reachable(qn_file(&candidates[0])) {
-                CONF_UNIQUE_NAME
-            } else if imports.bindings.is_empty() && imports.modules.is_empty() {
+            let conf = if imports.is_reachable(qn_file(&candidates[0]))
+                || (imports.bindings.is_empty() && imports.modules.is_empty())
+            {
                 CONF_UNIQUE_NAME
             } else {
                 CONF_UNIQUE_NAME * 0.5

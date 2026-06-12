@@ -17,6 +17,7 @@ const LSP_CROSS_CONFIDENCE: f64 = 0.85;
 
 const JS_LANGS: &[&str] = &["javascript", "jsx", "typescript", "tsx"];
 
+#[allow(dead_code)]
 pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec<Edge> {
     resolve_cross_file_calls_root(symbols, files, None)
 }
@@ -355,10 +356,10 @@ fn guess_go_struct_for_file(
 ) -> Option<String> {
     let norm = target.replace('\\', "/");
     for (class_name, entries) in class_index {
-        if entries.iter().any(|e| path_matches(&e.file, &norm)) {
-            if methods_by_file.get(&entries[0].file).is_some() {
-                return Some(class_name.clone());
-            }
+        if entries.iter().any(|e| path_matches(&e.file, &norm))
+            && methods_by_file.get(&entries[0].file).is_some()
+        {
+            return Some(class_name.clone());
         }
     }
     None
@@ -372,6 +373,7 @@ fn import_name_bindings(imports: &ImportMap) -> HashMap<String, String> {
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_attribute_calls(
     config: AttributeCallConfig,
     file_path: &str,
