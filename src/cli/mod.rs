@@ -21,6 +21,7 @@ CLI OUTPUT:
     --quiet    Suppress tracing logs (recommended for scripts piping stdout)
     codebase-memory-mcp install [--dry-run] [--force] [--yes] [--all]
     codebase-memory-mcp uninstall [--dry-run] [--yes] [--all] [--keep-binary]
+    codebase-memory-mcp hook-session-start
     codebase-memory-mcp hook-augment
     codebase-memory-mcp config <list|get|snippet>
     codebase-memory-mcp --version

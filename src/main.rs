@@ -55,6 +55,8 @@ enum Command {
         #[arg(long)]
         keep_binary: bool,
     },
+    /// SessionStart reminder hook (prints graph-first guidance)
+    HookSessionStart,
     /// PreToolUse graph augmenter (reads hook JSON from stdin)
     HookAugment,
     /// Config utilities
@@ -113,6 +115,9 @@ fn main() {
         Some(Command::HookAugment) => {
             cli::run_hook_augment();
             Ok(())
+        }
+        Some(Command::HookSessionStart) => {
+            std::process::exit(codebase_memory_mcp::hooks::hook_session_start());
         }
         Some(Command::Config { action }) => cli::run_config(&action),
         Some(Command::Ui { port }) => cli::run_ui_server(port),
