@@ -3,11 +3,7 @@ use codebase_memory_mcp::cli;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(
-    name = "codebase-memory-mcp",
-    version,
-    about = "codebase-memory-mcp — Rust knowledge graph MCP server"
-)]
+#[command(name = "cbm", version, about = "cbm — Rust knowledge graph MCP server")]
 struct Args {
     #[command(subcommand)]
     command: Option<Command>,

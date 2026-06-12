@@ -46,9 +46,9 @@ function Get-ArtifactName([string]$Target) {
 
 function Get-BinaryPath([string]$Target) {
     if ($Target -like "*windows*") {
-        return Join-Path $Root "target\$Target\release\codebase-memory-mcp.exe"
+        return Join-Path $Root "target\$Target\release\cbm.exe"
     }
-    return Join-Path $Root "target\$Target\release\codebase-memory-mcp"
+    return Join-Path $Root "target\$Target\release\cbm"
 }
 
 function Build-Target([string]$Target) {

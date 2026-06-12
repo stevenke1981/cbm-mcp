@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": "stevenke1981/cbm-mcp",
   "artifacts": [
     {
@@ -8,7 +8,7 @@
       "arch": "x64",
       "format": "zip",
       "file": "cbm-mcp-windows-x64.zip",
-      "binary": "codebase-memory-mcp.exe"
+      "binary": "cbm.exe"
     },
     {
       "id": "cbm-mcp-linux-x64",
@@ -16,7 +16,7 @@
       "arch": "x64",
       "format": "tar.gz",
       "file": "cbm-mcp-linux-x64.tar.gz",
-      "binary": "codebase-memory-mcp"
+      "binary": "cbm"
     },
     {
       "id": "cbm-mcp-linux-arm64",
@@ -24,7 +24,7 @@
       "arch": "arm64",
       "format": "tar.gz",
       "file": "cbm-mcp-linux-arm64.tar.gz",
-      "binary": "codebase-memory-mcp"
+      "binary": "cbm"
     },
     {
       "id": "cbm-mcp-macos-x64",
@@ -32,7 +32,7 @@
       "arch": "x64",
       "format": "tar.gz",
       "file": "cbm-mcp-macos-x64.tar.gz",
-      "binary": "codebase-memory-mcp"
+      "binary": "cbm"
     },
     {
       "id": "cbm-mcp-macos-arm64",
@@ -40,7 +40,7 @@
       "arch": "arm64",
       "format": "tar.gz",
       "file": "cbm-mcp-macos-arm64.tar.gz",
-      "binary": "codebase-memory-mcp"
+      "binary": "cbm"
     }
   ]
 }

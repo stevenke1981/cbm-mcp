@@ -4,7 +4,7 @@ use assert_cmd::Command;
 use serde_json::Value;
 
 fn cbm_mcp() -> Command {
-    Command::cargo_bin("codebase-memory-mcp").unwrap()
+    Command::cargo_bin("cbm").unwrap()
 }
 
 fn parse_stdout_json(out: &[u8]) -> Option<Value> {
@@ -17,7 +17,7 @@ fn list_projects_json_quiet_stdout_is_parseable() {
     let output = cbm_mcp()
         .args(["cli", "list_projects", "--json", "--quiet"])
         .output()
-        .expect("spawn codebase-memory-mcp");
+        .expect("spawn cbm");
     assert!(output.status.success(), "exit failed: {:?}", output);
     assert!(
         output.stderr.is_empty(),
@@ -34,7 +34,7 @@ fn index_repository_json_stdout_parseable_with_stderr_diagnostics() {
     let output = cbm_mcp()
         .args(["cli", "index_repository", "--json", json])
         .output()
-        .expect("spawn codebase-memory-mcp");
+        .expect("spawn cbm");
     assert!(output.status.success());
     let parsed = parse_stdout_json(&output.stdout).expect("stdout is not valid JSON");
     assert_eq!(parsed.get("success").and_then(|v| v.as_bool()), Some(true));
@@ -46,7 +46,7 @@ fn json_without_quiet_keeps_stdout_parseable() {
     let output = cbm_mcp()
         .args(["cli", "index_repository", "--json", json])
         .output()
-        .expect("spawn codebase-memory-mcp");
+        .expect("spawn cbm");
     assert!(output.status.success());
     assert!(parse_stdout_json(&output.stdout).is_some());
 }

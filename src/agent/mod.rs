@@ -59,7 +59,7 @@ impl AgentKind {
             Self::ClaudeCode => home.join(".claude"),
             Self::Codex => home.join(".codex"),
             Self::GeminiCli => home.join(".gemini"),
-            Self::OpenCode => home.join(".opencode"),
+            Self::OpenCode => home.join(".config").join("opencode"),
             Self::Zed => home.join(".zed"),
             Self::Aider => home.join(".aider"),
             _ => home.join(".config").join("cbm-mcp"),
@@ -69,10 +69,10 @@ impl AgentKind {
     pub fn mcp_config_snippet(&self) -> serde_json::Value {
         let bin = std::env::current_exe()
             .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| "codebase-memory-mcp".into());
+            .unwrap_or_else(|_| "cbm".into());
         serde_json::json!({
             "mcpServers": {
-                "codebase-memory-mcp": {
+                "cbm": {
                     "command": bin,
                     "args": [],
                     "env": {

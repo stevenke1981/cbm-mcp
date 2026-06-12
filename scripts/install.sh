@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-BINARY="$ROOT_DIR/target/release/codebase-memory-mcp"
+BINARY="$ROOT_DIR/target/release/cbm"
 
 SKIP_BUILD=false
 ALL_AGENTS=false
@@ -40,10 +40,10 @@ if [ "$ALL_AGENTS" = true ]; then
   INSTALL_ARGS+=(--all)
 fi
 
-echo -e "${GRAY}Running codebase-memory-mcp install...${NC}"
+echo -e "${GRAY}Running cbm install...${NC}"
 "$BINARY" "${INSTALL_ARGS[@]}"
 
 echo ""
 echo -e "${GREEN}Done! Restart your coding agent.${NC}"
-echo -e "${GRAY}MCP server: codebase-memory-mcp${NC}"
+echo -e "${GRAY}MCP server: cbm${NC}"
 echo -e "${GRAY}Binary:     $BINARY${NC}"

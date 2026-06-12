@@ -8,28 +8,28 @@ use serde_json::Value;
 
 pub fn print_help() {
     eprintln!(
-        r#"{SERVER_NAME} v{SERVER_VERSION} — codebase-memory-mcp (Rust)
+        r#"{SERVER_NAME} v{SERVER_VERSION} — CBM knowledge graph (Rust)
 
 USAGE:
-    codebase-memory-mcp                Run MCP server (stdio JSON-RPC)
-    codebase-memory-mcp [--ui] [--port=9749]   MCP server + optional graph UI
-    codebase-memory-mcp ui [--port=9749]       Graph UI only
-    codebase-memory-mcp cli [--json] [--quiet] <tool> [args_json]
+    cbm                Run MCP server (stdio JSON-RPC)
+    cbm [--ui] [--port=9749]   MCP server + optional graph UI
+    cbm ui [--port=9749]       Graph UI only
+    cbm cli [--json] [--quiet] <tool> [args_json]
 
 CLI OUTPUT:
     --json     Machine-readable JSON on stdout; diagnostics on stderr
     --quiet    Suppress tracing logs (recommended for scripts piping stdout)
-    codebase-memory-mcp install [--dry-run] [--force] [--yes] [--all]
-    codebase-memory-mcp uninstall [--dry-run] [--yes] [--all] [--keep-binary]
-    codebase-memory-mcp hook-session-start
-    codebase-memory-mcp hook-augment
-    codebase-memory-mcp config <list|get|snippet>
-    codebase-memory-mcp --version
-    codebase-memory-mcp --help
+    cbm install [--dry-run] [--force] [--yes] [--all]
+    cbm uninstall [--dry-run] [--yes] [--all] [--keep-binary]
+    cbm hook-session-start
+    cbm hook-augment
+    cbm config <list|get|snippet>
+    cbm --version
+    cbm --help
 
 HTTP UI:
-    codebase-memory-mcp --ui --port 9749
-    CBM_UI=1 CBM_PORT=9749 codebase-memory-mcp
+    cbm --ui --port 9749
+    CBM_UI=1 CBM_PORT=9749 cbm
 
 GRAPH WORKFLOW:
     index_repository → search_graph / trace_path / query_graph / get_architecture
@@ -213,7 +213,7 @@ pub fn run_config(action: &str) -> Result<()> {
             );
         }
         _ => {
-            eprintln!("Usage: codebase-memory-mcp config <list|snippet>");
+            eprintln!("Usage: cbm config <list|snippet>");
         }
     }
     Ok(())
@@ -254,7 +254,7 @@ pub fn run_mcp_server(ui_config: UiConfig) -> Result<()> {
         server.stop();
     }
     if shutdown.is_triggered() {
-        eprintln!("codebase-memory-mcp shutdown complete");
+        eprintln!("cbm shutdown complete");
     } else if ui_config.enabled {
         if let Some(ref mut server) = http {
             eprintln!("MCP stdin closed; graph UI still running (Ctrl+C to exit)");

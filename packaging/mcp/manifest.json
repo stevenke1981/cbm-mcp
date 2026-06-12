@@ -1,10 +1,10 @@
 {
   "schema_version": "0.1",
-  "name": "codebase-memory-mcp",
-  "display_name": "codebase-memory-mcp",
-  "version": "0.1.0",
+  "name": "cbm",
+  "display_name": "cbm",
+  "version": "0.2.0",
   "transport": "stdio",
-  "command": "codebase-memory-mcp",
+  "command": "cbm",
   "args": [],
   "env": {
     "CBM_PROJECT_PREFIX": "cbm+",
@@ -32,9 +32,9 @@
     "ingest_traces"
   ],
   "install": {
-    "windows_binary": "target/release/codebase-memory-mcp.exe",
-    "unix_binary": "target/release/codebase-memory-mcp",
-    "recommended_command": "codebase-memory-mcp install --yes --all",
+    "windows_binary": "target/release/cbm.exe",
+    "unix_binary": "target/release/cbm",
+    "recommended_command": "cbm install --yes --all",
     "manual_templates": [
       "packaging/mcp/generic-mcp.json",
       "packaging/mcp/codex-config.toml",

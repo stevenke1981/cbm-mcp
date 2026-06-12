@@ -1,9 +1,9 @@
 # winget manifest template — update PackageIdentifier and InstallerSha256 on release
-PackageIdentifier: CodebaseMemoryMcp.CodebaseMemoryMcp
-PackageVersion: 0.1.0
+PackageIdentifier: CbmMcp.Cbm
+PackageVersion: 0.2.0
 PackageLocale: en-US
-Publisher: CodebaseMemoryMcp Contributors
-PackageName: codebase-memory-mcp
+Publisher: CBM Contributors
+PackageName: cbm
 PackageUrl: https://github.com/stevenke1981/cbm-mcp
 License: MIT
 ShortDescription: Rust codebase knowledge graph MCP server for AI coding agents
@@ -15,11 +15,11 @@ Tags:
 Installers:
   - Architecture: x64
     InstallerType: zip
-    InstallerUrl: https://github.com/stevenke1981/cbm-mcp/releases/download/v0.1.0/cbm-mcp-windows-x64.zip
+    InstallerUrl: https://github.com/stevenke1981/cbm-mcp/releases/download/v0.2.0/cbm-mcp-windows-x64.zip
     InstallerSha256: PLACEHOLDER
     NestedInstallerType: portable
     NestedInstallerFiles:
-      - RelativeFilePath: codebase-memory-mcp.exe
-        PortableCommandAlias: codebase-memory-mcp
+      - RelativeFilePath: cbm.exe
+        PortableCommandAlias: cbm
 ManifestType: singleton
 ManifestVersion: 1.6.0

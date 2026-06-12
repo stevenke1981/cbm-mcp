@@ -2,7 +2,7 @@ class CodebaseMemoryMcp < Formula
   desc "Rust codebase knowledge graph MCP server for AI coding agents"
   homepage "https://github.com/stevenke1981/cbm-mcp"
   license "MIT"
-  version "0.1.0"
+  version "0.2.0"
 
   on_macos do
     on_arm do
@@ -27,11 +27,11 @@ class CodebaseMemoryMcp < Formula
   end
 
   def install
-    bin.install "codebase-memory-mcp"
+    bin.install "cbm"
   end
 
   def post_install
-    ohai "Run 'codebase-memory-mcp install --yes --all' to configure MCP agents"
+    ohai "Run 'cbm install --yes --all' to configure MCP agents"
   end
 
   livecheck do
@@ -41,12 +41,12 @@ class CodebaseMemoryMcp < Formula
 
   def caveats
     <<~EOS
-      Run `codebase-memory-mcp install --yes --all` to register the MCP server with coding agents.
-      Optional graph UI: `codebase-memory-mcp --ui --port 9749`
+      Run `cbm install --yes --all` to register the MCP server with coding agents.
+      Optional graph UI: `cbm --ui --port 9749`
     EOS
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/codebase-memory-mcp --version")
+    assert_match version.to_s, shell_output("#{bin}/cbm --version")
   end
 end

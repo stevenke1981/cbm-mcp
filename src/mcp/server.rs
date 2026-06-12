@@ -6,7 +6,7 @@ use crate::watcher::Watcher;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-pub const SERVER_NAME: &str = "codebase-memory-mcp";
+pub const SERVER_NAME: &str = "cbm";
 pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct McpServer {
@@ -134,7 +134,7 @@ impl McpServer {
                 "version": SERVER_VERSION
             },
             "instructions": format!(
-                "codebase-memory-mcp graph server. Index with index_repository, then search_graph / trace_path / query_graph. Git watcher: {watcher_on}. RLM tools live in rlm-mcp (separate server)."
+                "cbm graph server. Index with index_repository, then search_graph / trace_path / query_graph. Git watcher: {watcher_on}. RLM tools live in rlm-mcp (separate server)."
             )
         })
     }
@@ -223,7 +223,7 @@ mod tests {
             "params": {}
         });
         let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        assert!(resp.contains("codebase-memory-mcp"));
+        assert!(resp.contains("\"name\":\"cbm\""));
     }
 
     #[test]

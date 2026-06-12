@@ -1,10 +1,10 @@
-# codebase-memory-mcp MCP package
+# cbm MCP package
 
-Handoff templates for agents wiring **codebase-memory-mcp** (graph index only).
+Handoff templates for agents wiring **cbm** (graph index only).
 
-Server name: `codebase-memory-mcp`  
-Transport: stdio  
-Binary: `codebase-memory-mcp` or absolute path to the release binary
+Server name: `cbm`
+Transport: stdio
+Binary: `cbm` / `cbm.exe` or absolute path to the release binary
 
 ## Fast path
 

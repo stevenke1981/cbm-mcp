@@ -31,9 +31,9 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw "cargo build --release failed" }
 }
 
-$Bin = Join-Path $Root "target\release\codebase-memory-mcp.exe"
+$Bin = Join-Path $Root "target\release\cbm.exe"
 if (-not (Test-Path $Bin)) {
-    $Bin = Join-Path $Root "target\release\codebase-memory-mcp"
+    $Bin = Join-Path $Root "target\release\cbm"
 }
 if (-not (Test-Path $Bin)) {
     throw "release binary not found; run without -SkipBuild"

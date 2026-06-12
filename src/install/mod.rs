@@ -8,7 +8,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 pub const MCP_SERVER_NAME: &str = SERVER_NAME;
-pub const INSTALL_DIR_NAME: &str = "codebase-memory-mcp";
+pub const INSTALL_DIR_NAME: &str = "cbm-mcp";
+const LEGACY_MCP_SERVER_NAMES: &[&str] = &["codebase-memory-mcp", "cbrlm-mcp", "cbm"];
 
 #[derive(Debug, Clone, Default)]
 pub struct InstallOptions {
@@ -50,11 +51,7 @@ pub fn default_install_dir() -> PathBuf {
 }
 
 pub fn installed_binary_path() -> PathBuf {
-    let name = if cfg!(windows) {
-        "codebase-memory-mcp.exe"
-    } else {
-        "codebase-memory-mcp"
-    };
+    let name = if cfg!(windows) { "cbm.exe" } else { "cbm" };
     default_install_dir().join(name)
 }
 
@@ -210,9 +207,7 @@ fn resolve_source_binary(override_path: Option<&Path>) -> Result<PathBuf> {
     if current.is_file() {
         return Ok(current);
     }
-    Err(Error::Other(
-        "could not resolve codebase-memory-mcp binary path".into(),
-    ))
+    Err(Error::Other("could not resolve cbm binary path".into()))
 }
 
 fn install_binary(source: &Path, dest: &Path) -> Result<()> {
@@ -268,6 +263,20 @@ impl AgentTarget {
     }
 
     fn path(&self) -> Option<PathBuf> {
+        if self.kind == AgentKind::OpenCode {
+            if let Ok(path) = std::env::var("OPENCODE_CONFIG") {
+                let trimmed = path.trim();
+                if !trimmed.is_empty() {
+                    return Some(PathBuf::from(trimmed));
+                }
+            }
+            if let Ok(dir) = std::env::var("OPENCODE_CONFIG_DIR") {
+                let trimmed = dir.trim();
+                if !trimmed.is_empty() {
+                    return Some(PathBuf::from(trimmed).join("opencode.json"));
+                }
+            }
+        }
         dirs::home_dir().map(|home| home.join(self.config_path))
     }
 }
@@ -276,15 +285,9 @@ fn all_targets() -> Vec<AgentTarget> {
     vec![
         AgentTarget {
             kind: AgentKind::OpenCode,
-            config_path: ".config/opencode/opencode.jsonc",
-            format: ConfigFormat::OpenCode,
-            create_if_missing: true,
-        },
-        AgentTarget {
-            kind: AgentKind::OpenCode,
             config_path: ".config/opencode/opencode.json",
             format: ConfigFormat::OpenCode,
-            create_if_missing: false,
+            create_if_missing: true,
         },
         AgentTarget {
             kind: AgentKind::Codex,
@@ -380,7 +383,34 @@ fn configure_agent(target: &AgentTarget, binary: &Path, opts: &InstallOptions) -
     }
 
     match target.format {
-        ConfigFormat::OpenCode => write_opencode_config(&path, binary, target.kind),
+        ConfigFormat::OpenCode => {
+            if std::env::var("OPENCODE_CONFIG")
+                .ok()
+                .is_some_and(|value| !value.trim().is_empty())
+            {
+                return write_opencode_config(&path, binary, target.kind);
+            }
+            let config_dir = path
+                .parent()
+                .ok_or_else(|| Error::Other("OpenCode config directory not found".into()))?;
+            let json = config_dir.join("opencode.json");
+            let jsonc = config_dir.join("opencode.jsonc");
+            let mut paths = Vec::new();
+            if json.exists() {
+                paths.push(json);
+            }
+            if jsonc.exists() {
+                paths.push(jsonc);
+            }
+            if paths.is_empty() {
+                paths.push(path);
+            }
+            let mut changed = false;
+            for config_path in paths {
+                changed |= write_opencode_config(&config_path, binary, target.kind)?;
+            }
+            Ok(changed)
+        }
         ConfigFormat::CodexToml => write_codex_config(&path, binary, target.kind),
         ConfigFormat::McpServersJson => write_mcp_servers_json(&path, binary, target.kind),
         ConfigFormat::FallbackJson => write_fallback_config(&path, binary, target.kind),
@@ -420,16 +450,14 @@ fn write_opencode_config(path: &Path, binary: &Path, agent: AgentKind) -> Result
         .as_object_mut()
         .ok_or_else(|| Error::Other("opencode mcp field is not an object".into()))?;
 
-    let key = if mcp.contains_key(MCP_SERVER_NAME) {
-        MCP_SERVER_NAME
-    } else if mcp.contains_key("cbm") {
-        "cbm"
-    } else {
-        MCP_SERVER_NAME
-    };
+    for legacy in LEGACY_MCP_SERVER_NAMES {
+        if *legacy != MCP_SERVER_NAME {
+            mcp.remove(*legacy);
+        }
+    }
 
     mcp.insert(
-        key.into(),
+        MCP_SERVER_NAME.into(),
         json!({
             "type": "local",
             "command": opencode_command(binary),
@@ -454,6 +482,11 @@ fn write_mcp_servers_json(path: &Path, binary: &Path, agent: AgentKind) -> Resul
         .as_object_mut()
         .ok_or_else(|| Error::Other("mcpServers field is not an object".into()))?;
 
+    for legacy in LEGACY_MCP_SERVER_NAMES {
+        if *legacy != MCP_SERVER_NAME {
+            servers.remove(*legacy);
+        }
+    }
     servers.insert(
         MCP_SERVER_NAME.into(),
         json!({
@@ -522,7 +555,11 @@ fn write_codex_config(path: &Path, binary: &Path, agent: AgentKind) -> Result<bo
     } else {
         String::new()
     };
-    let content = remove_codex_mcp_section(&content, MCP_SERVER_NAME);
+    let content = LEGACY_MCP_SERVER_NAMES
+        .iter()
+        .fold(content, |current, server| {
+            remove_codex_mcp_section(&current, server)
+        });
 
     let section_header = format!("[mcp_servers.{MCP_SERVER_NAME}]");
     let bin = binary.to_string_lossy().replace('\\', "/");
@@ -842,9 +879,9 @@ fn remove_agent_config(path: &Path, format: ConfigFormat) -> Result<bool> {
                 .get_mut("mcp")
                 .and_then(|v| v.as_object_mut())
                 .map(|mcp| {
-                    let primary = mcp.remove(MCP_SERVER_NAME).is_some();
-                    let alias = mcp.remove("cbm").is_some();
-                    primary || alias
+                    LEGACY_MCP_SERVER_NAMES
+                        .iter()
+                        .any(|server| mcp.remove(*server).is_some())
                 })
                 .unwrap_or(false);
             if removed {
@@ -858,9 +895,9 @@ fn remove_agent_config(path: &Path, format: ConfigFormat) -> Result<bool> {
                 .get_mut("mcpServers")
                 .and_then(|v| v.as_object_mut())
                 .map(|mcp| {
-                    let primary = mcp.remove(MCP_SERVER_NAME).is_some();
-                    let alias = mcp.remove("cbm").is_some();
-                    primary || alias
+                    LEGACY_MCP_SERVER_NAMES
+                        .iter()
+                        .any(|server| mcp.remove(*server).is_some())
                 })
                 .unwrap_or(false);
             if removed {
@@ -1001,7 +1038,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let cfg = dir.path().join("opencode.jsonc");
         fs::write(&cfg, r#"{"model":"test"}"#).unwrap();
-        let bin = dir.path().join("codebase-memory-mcp.exe");
+        let bin = dir.path().join("cbm.exe");
         fs::write(&bin, b"").unwrap();
 
         write_opencode_config(&cfg, &bin, AgentKind::OpenCode).unwrap();
@@ -1029,14 +1066,14 @@ mod tests {
 }"#,
         )
         .unwrap();
-        let bin = dir.path().join("stable").join("codebase-memory-mcp.exe");
+        let bin = dir.path().join("stable").join("cbm.exe");
         fs::create_dir_all(bin.parent().unwrap()).unwrap();
         fs::write(&bin, b"").unwrap();
 
         write_opencode_config(&cfg, &bin, AgentKind::OpenCode).unwrap();
         let parsed: Value = serde_json::from_str(&fs::read_to_string(&cfg).unwrap()).unwrap();
         assert!(parsed["mcp"]["cbm"].is_object());
-        assert!(parsed["mcp"].get(MCP_SERVER_NAME).is_none());
+        assert!(parsed["mcp"].get("codebase-memory-mcp").is_none());
         assert_eq!(
             parsed["mcp"]["cbm"]["command"][0].as_str(),
             Some(bin.to_string_lossy().as_ref())
@@ -1064,7 +1101,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let cfg = dir.path().join("config.toml");
         fs::write(&cfg, "model = \"gpt\"\n").unwrap();
-        let bin = dir.path().join("codebase-memory-mcp");
+        let bin = dir.path().join("cbm");
         fs::write(&bin, b"").unwrap();
 
         write_codex_config(&cfg, &bin, AgentKind::Codex).unwrap();
@@ -1080,7 +1117,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let cfg = dir.path().join("settings.json");
         fs::write(&cfg, r#"{"hooks":{}}"#).unwrap();
-        let bin = dir.path().join("codebase-memory-mcp.exe");
+        let bin = dir.path().join("cbm.exe");
         fs::write(&bin, b"").unwrap();
 
         write_mcp_servers_json(&cfg, &bin, AgentKind::ClaudeCode).unwrap();
@@ -1092,7 +1129,7 @@ mod tests {
     #[test]
     fn default_install_dir_under_config() {
         let dir = default_install_dir();
-        assert!(dir.to_string_lossy().contains("codebase-memory-mcp"));
+        assert!(dir.to_string_lossy().contains("cbm-mcp"));
         assert!(dir.ends_with("bin"));
     }
 }

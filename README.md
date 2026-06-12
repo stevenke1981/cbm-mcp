@@ -1,4 +1,4 @@
-# codebase-memory-mcp (Rust)
+# cbm-mcp (Rust)
 
 Independent Rust implementation of **[codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)** — knowledge-graph indexer and MCP server for AI coding agents.
 
@@ -8,7 +8,7 @@ Independent Rust implementation of **[codebase-memory-mcp](https://github.com/De
 
 | Path | MCP server | Role |
 |------|------------|------|
-| `D:\cbm-mcp` | `codebase-memory-mcp` | **This repo** — graph indexing, 14 MCP tools |
+| `D:\cbm-mcp` | `cbm` | **This repo** — graph indexing, 14 MCP tools |
 | `D:\rlm-mcp` | `rlm-mcp` | Standalone RLM sessions (scan/peek/chunk) |
 | `D:\cbm\cbrlm` | `cbrlm-mcp` (legacy) | Deprecated combined binary |
 
@@ -19,7 +19,7 @@ The two servers are **not integrated** — enable both in the agent only if you 
 ```powershell
 cd D:\cbm-mcp
 .\install.ps1
-codebase-memory-mcp --version
+cbm --version
 ```
 
 `install.ps1` / `install.sh` download the latest GitHub Release binary by default. Agents can install directly from a checkout without compiling Rust.
@@ -44,11 +44,11 @@ Unix:
 Pin a version:
 
 ```powershell
-.\install.ps1 -Version v0.1.0
+.\install.ps1 -Version v0.2.0
 ```
 
 ```bash
-CBM_VERSION=v0.1.0 ./install.sh
+CBM_VERSION=v0.2.0 ./install.sh
 ```
 
 ### Build from source checkout
@@ -88,15 +88,15 @@ Release archives include the binary, `README.md`, `LICENSE`, and `mcp-templates/
 ### Index + search
 
 ```powershell
-codebase-memory-mcp cli index_repository --json --quiet '{"repo_path":".","project":"my-app","mode":"fast"}'
-codebase-memory-mcp cli search_graph --json '{"project":"my-app","query":"handler","limit":10}'
+cbm cli index_repository --json --quiet '{"repo_path":".","project":"my-app","mode":"fast"}'
+cbm cli search_graph --json '{"project":"my-app","query":"handler","limit":10}'
 ```
 
 ### MCP server (stdio)
 
 ```powershell
-codebase-memory-mcp
-# MCP server name: codebase-memory-mcp
+cbm
+# MCP server name: cbm
 ```
 
 ### Optional: with rlm-mcp
@@ -106,9 +106,9 @@ Register **two independent** MCP servers when you need both graph and RLM:
 ```json
 {
   "mcp": {
-    "codebase-memory-mcp": {
+    "cbm": {
       "type": "local",
-      "command": ["codebase-memory-mcp"],
+      "command": ["cbm"],
       "enabled": true
     },
     "rlm-mcp": {
@@ -134,7 +134,7 @@ Rust MVP toward full reference parity with `D:\_cbm-ref`. See [`TODO.md`](TODO.m
 
 | Variable | Purpose |
 |----------|---------|
-| `CBM_CACHE_DIR` | Cache dir (default `%LOCALAPPDATA%\codebase-memory-mcp`) |
+| `CBM_CACHE_DIR` | Cache dir (default OS cache directory under `cbm-mcp`) |
 | `CBRLM_CACHE_DIR` | Legacy alias for cache dir |
 | `CBM_WATCHER` | `0` disables background reindex watcher |
 | `CBM_SEMANTIC_ENABLED=1` | Enable semantic pass |
@@ -152,3 +152,5 @@ Use [`packaging/mcp/`](packaging/mcp/) for ready templates:
 - `manifest.json`
 
 Replace `{{CBM_BINARY}}` with the absolute path printed by `install.ps1` / `install.sh`, or use the stable installed binary path.
+
+Windows installs the executable as `%USERPROFILE%\.config\cbm-mcp\bin\cbm.exe`. The installer updates both existing `opencode.json` and `opencode.jsonc` files so stale legacy entries cannot override the new command.

@@ -1,7 +1,7 @@
-[mcp_servers.codebase-memory-mcp]
+[mcp_servers.cbm]
 command = "{{CBM_BINARY}}"
 args = []
 
-[mcp_servers.codebase-memory-mcp.env]
+[mcp_servers.cbm.env]
 CBM_PROJECT_PREFIX = "cbm+"
 CBM_AGENT = "codex"

@@ -16,8 +16,8 @@ const MAX_WALKUP: usize = 8;
 const DEADLINE_MS: u64 = 300;
 
 pub const SESSION_REMINDER: &str = "\
-CRITICAL - Code Discovery Protocol (codebase-memory-mcp):
-1. ALWAYS use codebase-memory-mcp graph tools FIRST for code exploration:
+CRITICAL - Code Discovery Protocol (cbm):
+1. ALWAYS use cbm graph tools FIRST for code exploration:
    - search_graph to find functions, classes, routes
    - trace_path for call chains and data flow
    - get_code_snippet for exact symbol source
@@ -27,10 +27,10 @@ CRITICAL - Code Discovery Protocol (codebase-memory-mcp):
 5. If the project is not indexed yet, run index_repository FIRST.";
 
 pub const CODEX_SESSION_REMINDER_CMD: &str = "\
-echo \"Code discovery: prefer codebase-memory-mcp (search_graph, trace_path, get_code_snippet) over grep/file-read; projects use cbm+ prefix; run index_repository first if not indexed. For long logs use rlm-mcp.\"";
+echo \"Code discovery: prefer cbm (search_graph, trace_path, get_code_snippet) over grep/file-read; projects use cbm+ prefix; run index_repository first if not indexed. For long logs use rlm-mcp.\"";
 
-pub const CODEX_HOOK_BEGIN: &str = "# >>> codebase-memory-mcp SessionStart >>>";
-pub const CODEX_HOOK_END: &str = "# <<< codebase-memory-mcp SessionStart <<<";
+pub const CODEX_HOOK_BEGIN: &str = "# >>> cbm SessionStart >>>";
+pub const CODEX_HOOK_END: &str = "# <<< cbm SessionStart <<<";
 
 pub fn hook_session_start() -> i32 {
     print!("{SESSION_REMINDER}");
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn session_reminder_mentions_server() {
-        assert!(SESSION_REMINDER.contains("codebase-memory-mcp"));
+        assert!(SESSION_REMINDER.contains("cbm"));
         assert!(!SESSION_REMINDER.contains("rlm_filter"));
     }
 }

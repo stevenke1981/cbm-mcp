@@ -43,35 +43,18 @@ fn expected_tool_names_from_specs() -> BTreeSet<String> {
 }
 
 fn write_mcp_frame(stdin: &mut ChildStdin, body: &str) {
-    writeln!(stdin, "Content-Length: {}", body.len()).expect("write header");
-    writeln!(stdin).expect("write header blank line");
-    stdin.write_all(body.as_bytes()).expect("write body");
+    writeln!(stdin, "{body}").expect("write JSON-RPC line");
     stdin.flush().expect("flush stdin");
 }
 
 fn read_mcp_frame(reader: &mut impl BufRead) -> String {
-    let mut len = 0usize;
-    loop {
-        let mut line = String::new();
-        let n = reader.read_line(&mut line).expect("read header line");
-        if n == 0 {
-            panic!("unexpected EOF before MCP body");
-        }
-        let trimmed = line.trim_end();
-        if trimmed.is_empty() {
-            break;
-        }
-        if let Some(rest) = trimmed.to_lowercase().strip_prefix("content-length:") {
-            len = rest.trim().parse().expect("parse Content-Length");
-        }
-    }
-    let mut buf = vec![0u8; len];
-    reader.read_exact(&mut buf).expect("read MCP body");
-    String::from_utf8(buf).expect("utf8 body")
+    let mut line = String::new();
+    reader.read_line(&mut line).expect("read JSON-RPC line");
+    line.trim_end().to_string()
 }
 
 fn spawn_mcp_process(cache_dir: &Path) -> Child {
-    let bin = cargo_bin("codebase-memory-mcp");
+    let bin = cargo_bin("cbm");
     Command::new(bin)
         .env("CBM_WATCHER", "0")
         .env("CBRLM_WATCHER", "0")
@@ -112,7 +95,7 @@ fn mcp_process_initialize_tools_list_snapshot_and_call() {
     let result = init_resp.get("result").expect("initialize result");
     assert_eq!(
         result.pointer("/serverInfo/name").and_then(|v| v.as_str()),
-        Some("codebase-memory-mcp")
+        Some("cbm")
     );
 
     let list = serde_json::json!({

@@ -1,6 +1,6 @@
 [package]
 name = "codebase-memory-mcp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "codebase-memory-mcp — Rust knowledge graph MCP server for AI coding agents"
 license = "MIT"
@@ -13,7 +13,7 @@ name = "codebase_memory_mcp"
 path = "src/lib.rs"
 
 [[bin]]
-name = "codebase-memory-mcp"
+name = "cbm"
 path = "src/main.rs"
 
 [dependencies]

@@ -91,17 +91,17 @@ artifact_name() {
 binary_path() {
   local target="$1"
   if [ "$target" = "native" ]; then
-    if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -f "$ROOT/target/release/codebase-memory-mcp.exe" ]; then
-      echo "$ROOT/target/release/codebase-memory-mcp.exe"
+    if [ "$(uname -s)" = "MINGW"* ] || [ "$(uname -s)" = "MSYS"* ] || [ -f "$ROOT/target/release/cbm.exe" ]; then
+      echo "$ROOT/target/release/cbm.exe"
     else
-      echo "$ROOT/target/release/codebase-memory-mcp"
+      echo "$ROOT/target/release/cbm"
     fi
     return
   fi
   if [[ "$target" == *"windows"* ]]; then
-    echo "$ROOT/target/$target/release/codebase-memory-mcp.exe"
+    echo "$ROOT/target/$target/release/cbm.exe"
   else
-    echo "$ROOT/target/$target/release/codebase-memory-mcp"
+    echo "$ROOT/target/$target/release/cbm"
   fi
 }
 

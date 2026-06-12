@@ -2,7 +2,7 @@
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/windows/install.ps1 | iex
-#   $env:CBM_VERSION = "v0.1.0"; .\packaging\windows\install.ps1
+#   $env:CBM_VERSION = "v0.2.0"; .\packaging\windows\install.ps1
 
 param(
     [string]$Version = $(if ($env:CBM_VERSION) { $env:CBM_VERSION } elseif ($env:CBRLM_VERSION) { $env:CBRLM_VERSION } else { "latest" }),
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$InstallDir = if ($env:CBM_INSTALL_DIR) { $env:CBM_INSTALL_DIR } elseif ($env:CBRLM_INSTALL_DIR) { $env:CBRLM_INSTALL_DIR } else { "$env:LOCALAPPDATA\cbm-mcp\bin" }
+$InstallDir = if ($env:CBM_INSTALL_DIR) { $env:CBM_INSTALL_DIR } elseif ($env:CBRLM_INSTALL_DIR) { $env:CBRLM_INSTALL_DIR } else { "$env:USERPROFILE\.config\cbm-mcp\bin" }
 $Artifact = "cbm-mcp-windows-x64"
 $Archive = "$Artifact.zip"
 
@@ -42,7 +42,9 @@ if ($actual -ne $expected.ToLower()) {
 }
 
 Expand-Archive -Path $ArchivePath -DestinationPath $Tmp -Force
-Copy-Item (Join-Path $Tmp "codebase-memory-mcp.exe") (Join-Path $InstallDir "codebase-memory-mcp.exe") -Force
+$Extracted = Get-ChildItem -Path $Tmp -Filter "cbm.exe" -Recurse | Select-Object -First 1
+if (-not $Extracted) { throw "cbm.exe not found in archive" }
+Copy-Item $Extracted.FullName (Join-Path $InstallDir "cbm.exe") -Force
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$InstallDir*") {
@@ -51,8 +53,8 @@ if ($userPath -notlike "*$InstallDir*") {
     Write-Host "Added $InstallDir to user PATH"
 }
 
-$bin = Join-Path $InstallDir "codebase-memory-mcp.exe"
+$bin = Join-Path $InstallDir "cbm.exe"
 & $bin install --yes --all
 
 Write-Host ""
-Write-Host "Installed codebase-memory-mcp $Version → $bin" -ForegroundColor Green
+Write-Host "Installed cbm $Version -> $bin" -ForegroundColor Green

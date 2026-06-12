@@ -3,7 +3,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/linux/install.sh | bash
-#   CBM_VERSION=v0.1.0 ./packaging/linux/install.sh
+#   CBM_VERSION=v0.2.0 ./packaging/linux/install.sh
 
 set -euo pipefail
 
@@ -54,8 +54,8 @@ fi
 tar -xzf "$TMP/${ARCHIVE}" -C "$TMP"
 
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR"
-install -m 755 "$TMP/codebase-memory-mcp" "$CONFIG_DIR/codebase-memory-mcp"
-ln -sf "$CONFIG_DIR/codebase-memory-mcp" "$INSTALL_DIR/codebase-memory-mcp"
+install -m 755 "$TMP/cbm" "$CONFIG_DIR/cbm"
+ln -sf "$CONFIG_DIR/cbm" "$INSTALL_DIR/cbm"
 
 if ! echo ":$PATH:" | grep -q ":${INSTALL_DIR}:"; then
   echo ""
@@ -63,7 +63,7 @@ if ! echo ":$PATH:" | grep -q ":${INSTALL_DIR}:"; then
 fi
 
 echo "Configuring MCP agents..."
-"$CONFIG_DIR/codebase-memory-mcp" install --yes --all || true
+"$CONFIG_DIR/cbm" install --yes --all
 
 echo ""
-echo "Installed codebase-memory-mcp ${VERSION} → ${CONFIG_DIR}/codebase-memory-mcp"
+echo "Installed cbm ${VERSION} -> ${CONFIG_DIR}/cbm"

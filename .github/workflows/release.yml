@@ -79,14 +79,14 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/package-artifact.sh
-          BIN="target/${{ matrix.target }}/release/codebase-memory-mcp"
+          BIN="target/${{ matrix.target }}/release/cbm"
           ./scripts/package-artifact.sh "${{ matrix.artifact }}" "$BIN"
 
       - name: Package archive (Windows)
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          $bin = "target/${{ matrix.target }}/release/codebase-memory-mcp.exe"
+          $bin = "target/${{ matrix.target }}/release/cbm.exe"
           ./scripts/package-artifact.ps1 "${{ matrix.artifact }}" $bin
 
       - name: Smoke release artifact (Windows)

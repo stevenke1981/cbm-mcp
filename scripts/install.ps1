@@ -1,4 +1,4 @@
-# Install cbm-mcp (codebase-memory-mcp) — build, copy binary, configure agents.
+# Install cbm-mcp — build, copy cbm.exe, configure agents.
 #
 # Usage:
 #   .\scripts\install.ps1
@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent $ScriptDir
-$BuiltBinary = Join-Path $RootDir "target\release\codebase-memory-mcp.exe"
+$BuiltBinary = Join-Path $RootDir "target\release\cbm.exe"
 
 function Write-Step([string]$Msg) {
     Write-Host ""
@@ -36,14 +36,14 @@ if (-not (Test-Path $BuiltBinary)) {
     throw "Binary not found: $BuiltBinary (run without -SkipBuild)"
 }
 
-Write-Step "Running codebase-memory-mcp install..."
+Write-Step "Running cbm install..."
 $installArgs = @("install", "--yes", "--force")
 if ($AllAgents) { $installArgs += "--all" }
 
 & $BuiltBinary @installArgs
-if ($LASTEXITCODE -ne 0) { throw "codebase-memory-mcp install failed" }
+if ($LASTEXITCODE -ne 0) { throw "cbm install failed" }
 
 Write-Host ""
 Write-Host "Done! Restart your coding agent." -ForegroundColor Green
-Write-Host "MCP server: codebase-memory-mcp" -ForegroundColor DarkGray
+Write-Host "MCP server: cbm" -ForegroundColor DarkGray
 Write-Host "Binary:     $BuiltBinary" -ForegroundColor DarkGray
