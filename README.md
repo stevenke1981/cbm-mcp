@@ -18,25 +18,49 @@ The two servers are **not integrated** — enable both in the agent only if you 
 
 ```powershell
 cd D:\cbm-mcp
-cargo build --release
-.\target\release\codebase-memory-mcp.exe --version
+.\install.ps1
+codebase-memory-mcp --version
 ```
+
+`install.ps1` / `install.sh` download the latest GitHub Release binary by default. Agents can install directly from a checkout without compiling Rust.
 
 ## Install
 
-### From source checkout
+### From checkout without compiling
 
 ```powershell
 cd D:\cbm-mcp
-.\install.ps1 -AllAgents
+.\install.ps1
 ```
 
-This builds `target\release\codebase-memory-mcp.exe`, copies it to `%USERPROFILE%\.config\codebase-memory-mcp\bin\`, installs agent MCP config, and writes the session hooks.
+This downloads the latest release archive, verifies `SHA256SUMS.txt`, installs the binary to a stable config path, installs agent MCP config, and writes the session hooks.
 
 Unix:
 
 ```bash
-./install.sh --all-agents
+./install.sh
+```
+
+Pin a version:
+
+```powershell
+.\install.ps1 -Version v0.1.0
+```
+
+```bash
+CBM_VERSION=v0.1.0 ./install.sh
+```
+
+### Build from source checkout
+
+Only use this for development or local unreleased changes:
+
+```powershell
+.\install.ps1 -FromSource -AllAgents
+```
+
+```bash
+./install.sh --from-source --all-agents
 ```
 
 ### From GitHub Release

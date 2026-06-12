@@ -36,6 +36,20 @@ trap 'rm -rf "$TMP"' EXIT
 
 echo "Downloading ${URL} ..."
 curl -fsSL "$URL" -o "$TMP/${ARCHIVE}"
+
+echo "Verifying checksum ..."
+curl -fsSL "${BASE}/SHA256SUMS.txt" -o "$TMP/SHA256SUMS.txt"
+expected="$(grep " ${ARCHIVE}$" "$TMP/SHA256SUMS.txt" | awk '{print $1}')"
+if [ -z "$expected" ]; then
+  echo "checksum for ${ARCHIVE} not found in SHA256SUMS.txt" >&2
+  exit 1
+fi
+actual="$(shasum -a 256 "$TMP/${ARCHIVE}" | awk '{print $1}')"
+if [ "$actual" != "$expected" ]; then
+  echo "checksum mismatch for ${ARCHIVE}" >&2
+  exit 1
+fi
+
 tar -xzf "$TMP/${ARCHIVE}" -C "$TMP"
 
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR"
@@ -47,10 +61,8 @@ if ! echo ":$PATH:" | grep -q ":${INSTALL_DIR}:"; then
   echo "Add to PATH: export PATH=\"${INSTALL_DIR}:\$PATH\""
 fi
 
-if command -v codebase-memory-mcp >/dev/null 2>&1; then
-  echo "Configuring MCP agents..."
-  codebase-memory-mcp install --yes --all || true
-fi
+echo "Configuring MCP agents..."
+"$CONFIG_DIR/codebase-memory-mcp" install --yes --all || true
 
 echo ""
 echo "Installed codebase-memory-mcp ${VERSION} → ${CONFIG_DIR}/codebase-memory-mcp"

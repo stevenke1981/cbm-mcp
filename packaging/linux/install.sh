@@ -62,10 +62,8 @@ if ! echo ":$PATH:" | grep -q ":${INSTALL_DIR}:"; then
   echo "Add to PATH: export PATH=\"${INSTALL_DIR}:\$PATH\""
 fi
 
-if command -v codebase-memory-mcp >/dev/null 2>&1; then
-  echo "Configuring MCP agents..."
-  codebase-memory-mcp install --yes --all || true
-fi
+echo "Configuring MCP agents..."
+"$CONFIG_DIR/codebase-memory-mcp" install --yes --all || true
 
 echo ""
 echo "Installed codebase-memory-mcp ${VERSION} → ${CONFIG_DIR}/codebase-memory-mcp"

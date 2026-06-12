@@ -9,11 +9,10 @@ Binary: `codebase-memory-mcp` or absolute path to the release binary
 ## Fast path
 
 ```powershell
-cargo build --release
-.\target\release\codebase-memory-mcp.exe install --yes --all
+.\install.ps1
 ```
 
-Restart the target agent after install.
+The checkout installer downloads the latest GitHub Release binary, verifies checksums, installs agent MCP config, and writes hooks. It does not compile Rust. Use `.\install.ps1 -FromSource` only for local unreleased development.
 
 ## Manual config
 
