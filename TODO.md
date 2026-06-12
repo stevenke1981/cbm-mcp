@@ -14,7 +14,7 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** LSP subprocess cross-file · wire `target_projects` · `manage_adr_sections` decision.
+**Next P0 slices:** LSP subprocess cross-file · `manage_adr_sections` decision · MCP process-level smoke.
 
 **Done recently:** `SymbolRegistry` + import-map CALLS · `GraphBuffer` staging (`graph_buffer.rs`).
 

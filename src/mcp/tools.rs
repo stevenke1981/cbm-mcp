@@ -49,6 +49,14 @@ impl ToolHandler {
         let repo_path = Self::require_str(args, "repo_path")?;
         let mode = args.get("mode").and_then(|v| v.as_str()).unwrap_or("full");
         let project = args.get("project").and_then(|v| v.as_str());
+        let path = std::path::Path::new(repo_path);
+
+        if mode.eq_ignore_ascii_case("cross-repo-intelligence") {
+            let targets = crate::pipeline::parse_target_projects(args)?;
+            let result = crate::pipeline::run_cross_repo_intelligence(path, project, &targets)?;
+            return Ok(serde_json::to_value(result)?);
+        }
+
         let incremental = args
             .get("incremental")
             .and_then(|v| v.as_bool())
@@ -58,7 +66,6 @@ impl ToolHandler {
             .and_then(|v| v.as_bool())
             .unwrap_or_else(crate::persistence::env_enabled);
         let pipeline = Pipeline::new(IndexMode::parse(mode)).set_export_artifact(persistence);
-        let path = std::path::Path::new(repo_path);
         let _guard = self
             .watcher
             .as_ref()

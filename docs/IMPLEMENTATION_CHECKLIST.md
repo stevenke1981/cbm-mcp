@@ -35,7 +35,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 
 - [x] `repo_path` (required)
 - [x] `project`, `mode`, `persistence`
-- [ ] `target_projects` (in schema; handler not wired)
+- [x] `target_projects` (`mode=cross-repo-intelligence`; `["*"]` supported)
 - [x] Response: success, counts, duration, artifact path
 
 ### Tool: `search_graph`

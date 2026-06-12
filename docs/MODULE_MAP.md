@@ -68,7 +68,7 @@
 | `tools/list` from specs | `mcp/tool_specs.rs` | Done |
 | Tool handlers (14 graph) | `mcp/tools.rs` | Partial |
 | Store cache / evict idle | `mcp/server.rs` | Partial |
-| `target_projects` arg | spec in `index_repository.json` | **Stub** — handler ignores |
+| `target_projects` arg | `index_repository` + `cross_repo.rs` | **Partial** — `mode=cross-repo-intelligence` MVP |
 | `manage_adr_sections` | docs only | **Missing** — merged into `manage_adr` or TBD |
 
 Checked-in tool schemas: `mcps/codebase-memory-mcp/tools/*.json` (snapshot-tested).

@@ -1,6 +1,7 @@
 mod calls;
 mod calls_ast;
 mod communities;
+mod cross_repo;
 mod extract;
 mod graph_buffer;
 mod import_map;
@@ -11,6 +12,7 @@ mod routes;
 mod structure;
 
 pub use calls::*;
+pub use cross_repo::{parse_target_projects, run_cross_repo_intelligence, CrossRepoResult};
 pub use graph_buffer::GraphBuffer;
 pub use import_map::ImportMap;
 pub use registry::{CallResolution, FileCallResolver, SymbolRegistry};

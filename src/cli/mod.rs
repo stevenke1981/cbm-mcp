@@ -60,6 +60,27 @@ pub fn run_cli(tool: &str, args_json: Option<&str>, json_output: bool, _quiet: b
 fn format_cli_human(tool: &str, result: &Value) -> String {
     match tool {
         "index_repository" => {
+            if result.get("mode").and_then(|v| v.as_str()) == Some("cross-repo-intelligence") {
+                let project = result
+                    .get("project")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?");
+                let scanned = result
+                    .get("projects_scanned")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let cross = result
+                    .get("total_cross_edges")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let ms = result
+                    .get("elapsed_ms")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                return format!(
+                    "cross-repo {project}: scanned={scanned} cross_edges={cross} ({ms:.0}ms)"
+                );
+            }
             let ok = result
                 .get("success")
                 .and_then(|v| v.as_bool())
