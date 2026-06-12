@@ -14,7 +14,7 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** LSP subprocess cross-file · MCP process-level smoke.
+**Next P0 slices:** LSP subprocess cross-file.
 
 **Done recently:** `manage_adr` mode=sections · project rename `cbm-mcp` · `SymbolRegistry` + import-map CALLS · `GraphBuffer` staging.
 
@@ -86,7 +86,7 @@ Acceptance criteria:
   - error messages/categories
   - response fields
 - [ ] Decide whether ``manage_adr` mode=sections implemented (reference uses mode, not separate tool).
-- [ ] Add process-level MCP inspector smoke for `tools/list` and at least one `tools/call`.
+- [x] Add process-level MCP inspector smoke for `tools/list` and at least one `tools/call` (`tests/mcp_process_test.rs`).
 
 Acceptance criteria:
 

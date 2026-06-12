@@ -24,7 +24,7 @@
 |----------------|------|-----------|--------|-------|
 | `src/main.c` | Entry, signals, threads | `src/main.rs` | Partial | Ctrl+C shutdown; no parent watchdog |
 | `src/cli/` | CLI dispatch, hook-augment | `src/cli/`, `src/hooks/` | Partial | `--json --quiet` done; `config` subcmd partial |
-| `src/mcp/` | JSON-RPC MCP server | `src/mcp/` | Partial | 14 tools; no process-level inspector smoke yet |
+| `src/mcp/` | JSON-RPC MCP server | `src/mcp/` | Partial | 14 tools; process-level smoke in `tests/mcp_process_test.rs` |
 | `src/pipeline/` | Index passes + registry | `src/pipeline/` | Partial | ~8 passes vs ~20 reference passes |
 | `src/store/` | SQLite graph CRUD | `src/store/` | Partial | Bulk tx done; no read-only query mode |
 | `src/graph_buffer/` | In-memory staging | `pipeline/graph_buffer.rs` | **Partial** | MVP staging + edge dedup + single flush; no parallel worker merge |
