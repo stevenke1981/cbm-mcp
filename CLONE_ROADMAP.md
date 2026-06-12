@@ -2,6 +2,8 @@
 
 Target: feature-equivalent Rust rewrite of `D:\_cbm-ref` (DeusData/codebase-memory-mcp C core).
 
+**Module map:** [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · **Checklist:** [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md)
+
 ## Architecture split (done)
 
 - **cbm-mcp** (`D:\cbm-mcp`) — this repo; 14 graph MCP tools only
@@ -9,9 +11,10 @@ Target: feature-equivalent Rust rewrite of `D:\_cbm-ref` (DeusData/codebase-memo
 
 ## P0 — graph correctness
 
-- [ ] Hybrid LSP CALLS (Python, TS/JS, PHP, C#, Go, C/C++)
+- [x] Reference module inventory (`docs/MODULE_MAP.md`, `docs/IMPLEMENTATION_CHECKLIST.md`)
+- [ ] Hybrid LSP CALLS (Python, TS/JS, PHP, C#, Go, C/C++) — see `registry.c`, `pass_lsp_cross.c` in map
 - [x] Store bulk transaction API + rollback tests
-- [ ] Honest `get_graph_schema` vs emitted edges
+- [~] Honest `get_graph_schema` vs emitted edges (implemented; expand as new edge types land)
 
 ## P1 — reference pipeline
 

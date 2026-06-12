@@ -14,7 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** reference module inventory · hybrid CALLS/LSP · graph buffer staging layer.
+**Next P0 slices:** hybrid CALLS/LSP · graph buffer staging · wire `target_projects` · `manage_adr_sections` decision.
+
+Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
 Reference sources:
 
@@ -34,15 +36,15 @@ Definition of done:
 
 ## P0 - Baseline reference audit
 
-- [ ] Inventory reference repo modules from `D:\_cbm-ref`: `src/`, `internal/`, `pkg/`, `graph-ui/`, `scripts/`, `vendored/`, `test-infrastructure/`.
-- [ ] Convert `D:\cbm\knowledge-graph\architecture.md`, `specifications.md`, `functions.md`, and `knowledge-graph.md` into a Rust implementation checklist.
-- [ ] Produce a one-to-one module map:
+- [x] Inventory reference repo modules from `D:\_cbm-ref`: `src/`, `internal/`, `pkg/`, `graph-ui/`, `scripts/`, `vendored/`, `test-infrastructure/`. → [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md)
+- [x] Convert `D:\cbm\knowledge-graph\architecture.md`, `specifications.md`, `functions.md`, and `knowledge-graph.md` into a Rust implementation checklist. → [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md)
+- [x] Produce a one-to-one module map:
   - reference C/core module
   - Rust module path
   - status
   - missing behavior
   - fixture/test proving parity
-- [ ] Reconcile `CLONE_ROADMAP.md`, `PARITY_MATRIX.md`, and this `TODO.md`; this file is the execution backlog, `PARITY_MATRIX.md` is the public truth table.
+- [x] Reconcile `CLONE_ROADMAP.md`, `PARITY_MATRIX.md`, and this `TODO.md`; this file is the execution backlog, `PARITY_MATRIX.md` is the public truth table.
 - [x] Add a test that compares advertised MCP tools and schemas against checked-in specs under `mcps/codebase-memory-mcp/tools/` (`tests/mcp_tool_schema_test.rs`).
 
 Acceptance criteria:
