@@ -9,6 +9,14 @@ const CONF_UNIQUE_NAME: f64 = 0.75;
 const CONF_IMPORT_FILTERED: f64 = 0.55;
 const CONF_IMPORT_FILTERED_PENALTY: f64 = 0.30;
 
+/// Whether a call site targets a free function or an instance/class method.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallTargetKind {
+    FreeFunction,
+    Method,
+    Any,
+}
+
 /// Resolution result aligned with reference `cbm_resolution_t`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallResolution {
@@ -53,12 +61,45 @@ impl SymbolRegistry {
         self.by_name.get(&lookup).map(Vec::as_slice).unwrap_or(&EMPTY)
     }
 
+    pub fn symbol_label(&self, qn: &str) -> Option<&str> {
+        self.exact.get(qn).map(String::as_str)
+    }
+
+    fn filter_by_kind(&self, candidates: &[String], kind: CallTargetKind) -> Vec<String> {
+        match kind {
+            CallTargetKind::Any => candidates.to_vec(),
+            CallTargetKind::FreeFunction => candidates
+                .iter()
+                .filter(|qn| self.symbol_label(qn) == Some("Function"))
+                .cloned()
+                .collect(),
+            CallTargetKind::Method => candidates
+                .iter()
+                .filter(|qn| self.symbol_label(qn) == Some("Method"))
+                .cloned()
+                .collect(),
+        }
+    }
+
     pub fn resolve(&self, callee_name: &str, caller_file: &str, imports: &ImportMap) -> Option<CallResolution> {
+        self.resolve_kind(callee_name, caller_file, imports, CallTargetKind::Any)
+    }
+
+    pub fn resolve_kind(
+        &self,
+        callee_name: &str,
+        caller_file: &str,
+        imports: &ImportMap,
+        kind: CallTargetKind,
+    ) -> Option<CallResolution> {
         if callee_name.is_empty() {
             return None;
         }
 
-        let candidates = self.candidates(callee_name);
+        let candidates = self.filter_by_kind(self.candidates(callee_name), kind);
+        if candidates.is_empty() {
+            return None;
+        }
         if candidates.len() > MAX_CANDIDATES {
             return None;
         }
@@ -229,13 +270,25 @@ impl<'a> FileCallResolver<'a> {
     }
 
     pub fn resolve(&mut self, callee_name: &str) -> Option<CallResolution> {
-        if let Some(hit) = self.cache.get(callee_name) {
+        self.resolve_kind(callee_name, CallTargetKind::Any)
+    }
+
+    pub fn resolve_kind(
+        &mut self,
+        callee_name: &str,
+        kind: CallTargetKind,
+    ) -> Option<CallResolution> {
+        let cache_key = format!("{callee_name}:{kind:?}");
+        if let Some(hit) = self.cache.get(&cache_key) {
             return hit.clone();
         }
-        let res = self
-            .registry
-            .resolve(callee_name, &self.caller_file, &self.imports);
-        self.cache.insert(callee_name.to_string(), res.clone());
+        let res = self.registry.resolve_kind(
+            callee_name,
+            &self.caller_file,
+            &self.imports,
+            kind,
+        );
+        self.cache.insert(cache_key, res.clone());
         res
     }
 }
@@ -284,6 +337,47 @@ mod tests {
         let res = reg.resolve("helper", "main.py", &imports).unwrap();
         assert_eq!(res.strategy, "import_binding");
         assert!(res.qn.starts_with("utils.py::"));
+    }
+
+    fn method_sym(file: &str, name: &str, line: i64) -> Symbol {
+        Symbol {
+            qualified_name: qualified_name(file, "Method", name, line),
+            name: name.into(),
+            label: "Method".into(),
+            file_path: file.into(),
+            line_start: line,
+            line_end: line + 2,
+            signature: None,
+            properties_json: None,
+        }
+    }
+
+    #[test]
+    fn free_function_call_prefers_function_over_method() {
+        let reg = SymbolRegistry::from_symbols(&[
+            sym("app.js", "main", 10),
+            sym("app.js", "run", 1),
+            method_sym("app.js", "run", 5),
+        ]);
+        let imports = ImportMap::default();
+        let res = reg
+            .resolve_kind("run", "app.js", &imports, CallTargetKind::FreeFunction)
+            .unwrap();
+        assert_eq!(res.strategy, "same_file");
+        assert!(reg.symbol_label(&res.qn) == Some("Function"));
+    }
+
+    #[test]
+    fn method_call_does_not_resolve_to_free_function() {
+        let reg = SymbolRegistry::from_symbols(&[
+            sym("app.js", "main", 10),
+            sym("app.js", "run", 1),
+            method_sym("app.js", "run", 5),
+        ]);
+        let imports = ImportMap::default();
+        let res = reg.resolve_kind("run", "app.js", &imports, CallTargetKind::Method);
+        assert!(res.is_some());
+        assert!(reg.symbol_label(&res.as_ref().unwrap().qn) == Some("Method"));
     }
 
     #[test]

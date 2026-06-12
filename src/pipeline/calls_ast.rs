@@ -1,4 +1,4 @@
-use crate::pipeline::registry::{CallResolution, FileCallResolver};
+use crate::pipeline::registry::{CallResolution, CallTargetKind, FileCallResolver};
 use crate::store::{Edge, Symbol};
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Language, Parser, Query, QueryCursor};
@@ -39,15 +39,29 @@ pub fn resolve_calls_ast(
         while let Some(m) = matches.next() {
             let mut callee = String::new();
             let mut line = 0usize;
+            let mut kind = CallTargetKind::FreeFunction;
             for cap in m.captures {
                 let name = query.capture_names()[cap.index as usize];
-                if matches!(name, "callee" | "method" | "scoped") {
-                    callee = cap
-                        .node
-                        .utf8_text(content.as_bytes())
-                        .unwrap_or("")
-                        .to_string();
-                    line = cap.node.start_position().row;
+                match name {
+                    "callee" | "scoped" => {
+                        callee = cap
+                            .node
+                            .utf8_text(content.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
+                        line = cap.node.start_position().row;
+                        kind = CallTargetKind::FreeFunction;
+                    }
+                    "method" => {
+                        callee = cap
+                            .node
+                            .utf8_text(content.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
+                        line = cap.node.start_position().row;
+                        kind = CallTargetKind::Method;
+                    }
+                    _ => {}
                 }
             }
             if callee.is_empty() || is_noise_callee(language, &callee) || callee == sym.name {
@@ -57,7 +71,7 @@ pub fn resolve_calls_ast(
             if call_line < sym.line_start || call_line > sym.line_end {
                 continue;
             }
-            if let Some(res) = resolver.resolve(&callee) {
+            if let Some(res) = resolver.resolve_kind(&callee, kind) {
                 push_edge(&mut edges, &mut seen, sym, &res, "ast");
             }
         }

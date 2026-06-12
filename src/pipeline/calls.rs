@@ -1,5 +1,5 @@
 use crate::pipeline::import_map::ImportMap;
-use crate::pipeline::registry::{FileCallResolver, SymbolRegistry};
+use crate::pipeline::registry::{CallTargetKind, FileCallResolver, SymbolRegistry};
 use crate::store::{Edge, Symbol};
 
 pub use crate::pipeline::registry::SymbolRegistry as Registry;
@@ -53,9 +53,9 @@ fn resolve_calls_regex(
     _language: &str,
     resolver: &mut FileCallResolver<'_>,
 ) -> Vec<Edge> {
-    let call_patterns = [
-        regex::Regex::new(r"\b(\w+)\s*\(").unwrap(),
-        regex::Regex::new(r"\.(\w+)\s*\(").unwrap(),
+    let call_patterns: &[(&regex::Regex, CallTargetKind)] = &[
+        (&regex::Regex::new(r"\b(\w+)\s*\(").unwrap(), CallTargetKind::FreeFunction),
+        (&regex::Regex::new(r"\.(\w+)\s*\(").unwrap(), CallTargetKind::Method),
     ];
 
     let mut edges = Vec::new();
@@ -72,14 +72,14 @@ fn resolve_calls_regex(
         }
         let body = lines[start..end].join("\n");
         let mut seen = std::collections::HashSet::new();
-        for re in &call_patterns {
+        for (re, kind) in call_patterns {
             for cap in re.captures_iter(&body) {
                 if let Some(name_match) = cap.get(1) {
                     let callee_name = name_match.as_str();
                     if callee_name == sym.name || is_regex_noise(callee_name) {
                         continue;
                     }
-                    if let Some(res) = resolver.resolve(callee_name) {
+                    if let Some(res) = resolver.resolve_kind(callee_name, *kind) {
                         if res.qn == sym.qualified_name {
                             continue;
                         }

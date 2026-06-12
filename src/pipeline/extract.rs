@@ -171,11 +171,8 @@ fn language_looks_complete(sig: &str) -> bool {
 
 fn label_for_kind(kind: &str) -> Option<&'static str> {
     Some(match kind {
-        "function_item"
-        | "function_definition"
-        | "function_declaration"
-        | "method_declaration"
-        | "method_definition" => "Function",
+        "function_item" | "function_definition" | "function_declaration" => "Function",
+        "method_declaration" | "method_definition" => "Method",
         "struct_item"
         | "struct_specifier"
         | "class_specifier"
@@ -213,6 +210,14 @@ fn extract_symbols_regex(file_path: &str, language: &str, content: &str) -> Vec<
             ),
             (r"(?m)^\s*(?:public|private)?\s*class\s+(\w+)", "Class"),
             (r"(?m)^\s*(?:public|private)?\s*interface\s+(\w+)", "Class"),
+        ],
+        "php" => &[
+            (r"(?m)^\s*function\s+(\w+)", "Function"),
+            (r"(?m)^\s*class\s+(\w+)", "Class"),
+        ],
+        "c" | "cpp" => &[
+            (r"(?m)^\w[\w\s\*]*\s+(\w+)\s*\([^;]*\)\s*\{", "Function"),
+            (r"(?m)^\s*struct\s+(\w+)", "Class"),
         ],
         "javascript" | "typescript" | "jsx" | "tsx" => &[
             (

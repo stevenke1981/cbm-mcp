@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** method disambiguation · more negative CALLS fixtures (C/PHP).
+**Next P0 slices:** class/impl method resolution · C/C++ CALLS AST · PHP LSP.
 
-**Done recently:** `lsp_cross` Java + negative pipeline fixtures · Py/JS/Go · MCP process smoke · `manage_adr`.
+**Done recently:** method vs free-function disambiguation · C/PHP negative CALLS fixtures · `lsp_cross` Java · Py/JS/Go · MCP process smoke · `manage_adr`.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -176,7 +176,7 @@ Acceptance criteria:
   - [ ] PHP
 - [~] Add LSP-assisted cross-file resolution where the reference uses it (Python/JS/TS/Go/Java `lsp_cross.rs` MVP).
 - [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).
-- [ ] Add method vs free-function disambiguation.
+- [x] Add method vs free-function disambiguation (`CallTargetKind` + Method label in extract).
 - [ ] Add class/impl/trait/interface method resolution.
 - [ ] Add negative fixtures:
   - same symbol name in multiple files

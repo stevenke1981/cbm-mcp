@@ -149,3 +149,55 @@ fn nested_python_function_does_not_false_positive_outer() {
 
     let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
 }
+
+#[test]
+fn c_pipeline_skips_ambiguous_cross_file_calls() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(dir.path().join("main.c"), "int main() { helper(); return 0; }\n").unwrap();
+    std::fs::write(dir.path().join("a.c"), "void helper() {}\n").unwrap();
+    std::fs::write(dir.path().join("b.c"), "void helper() {}\n").unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("c-ambiguous-calls")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.c::Function::main@"))
+        .collect();
+    assert!(
+        main_calls.is_empty(),
+        "ambiguous cross-file helper in C should not link: {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
+fn php_pipeline_skips_ambiguous_cross_file_calls() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("main.php"),
+        "<?php\nfunction main() { helper(); }\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("a.php"), "<?php\nfunction helper() {}\n").unwrap();
+    std::fs::write(dir.path().join("b.php"), "<?php\nfunction helper() {}\n").unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("php-ambiguous-calls")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.php::Function::main@"))
+        .collect();
+    assert!(
+        main_calls.is_empty(),
+        "ambiguous cross-file helper in PHP should not link: {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
