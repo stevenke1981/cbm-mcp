@@ -103,6 +103,23 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
                     &methods_by_file,
                 ));
             }
+            "php" => {
+                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let bindings = infer_php_type_bindings(&file.content, &imports);
+                edges.extend(resolve_attribute_calls(
+                    AttributeCallConfig {
+                        language: tree_sitter_php::LANGUAGE_PHP_ONLY.into(),
+                        query_src: PHP_ATTR_QUERY,
+                    },
+                    &file.path,
+                    &file.content,
+                    &file_syms,
+                    &imports,
+                    &bindings,
+                    &class_index,
+                    &methods_by_file,
+                ));
+            }
             _ => {}
         }
     }
@@ -134,6 +151,12 @@ const JAVA_ATTR_QUERY: &str = r#"
 (method_invocation
   object: (_) @recv
   name: (identifier) @method)
+"#;
+
+const PHP_ATTR_QUERY: &str = r#"
+(member_call_expression
+  object: (_) @recv
+  name: (name) @method)
 "#;
 
 struct AttributeCallConfig {
@@ -234,6 +257,20 @@ fn infer_js_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String,
         let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
         if !var.is_empty() && !class_name.is_empty() {
             bindings.entry(var.to_string()).or_insert(class_name.to_string());
+        }
+    }
+    bindings
+}
+
+fn infer_php_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
+    let mut bindings = import_name_bindings(imports);
+    let assign_re =
+        regex::Regex::new(r"(?m)\$(\w+)\s*=\s*new\s+(\w+)\s*\(").expect("php assign regex");
+    for cap in assign_re.captures_iter(content) {
+        let var = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        if !var.is_empty() && !class_name.is_empty() {
+            bindings.insert(var.to_string(), class_name.to_string());
         }
     }
     bindings
@@ -399,11 +436,60 @@ fn infer_receiver_class(
             None
         }
         "object_creation_expression" => {
-            let type_node = recv.child_by_field_name("type")?;
-            java_type_name(type_node, content)
+            if let Some(type_node) = recv.child_by_field_name("type") {
+                if let Some(class) = java_type_name(type_node, content) {
+                    return Some(class);
+                }
+            }
+            php_object_class(recv, content)
+        }
+        "variable_name" => {
+            let text = recv.utf8_text(content.as_bytes()).ok()?;
+            let name = text.strip_prefix('$').unwrap_or(text);
+            if let Some(class) = bindings.get(name) {
+                return Some(class.clone());
+            }
+            if imports.bindings.contains_key(name) {
+                return Some(name.to_string());
+            }
+            None
+        }
+        "parenthesized_expression" => {
+            let mut cursor = recv.walk();
+            for child in recv.children(&mut cursor) {
+                if let Some(class) = infer_receiver_class(child, content, bindings, imports) {
+                    return Some(class);
+                }
+            }
+            None
         }
         _ => None,
     }
+}
+
+fn php_object_class(recv: tree_sitter::Node, content: &str) -> Option<String> {
+    if let Some(class_node) = recv.child_by_field_name("class") {
+        if let Some(class) = php_type_name(class_node, content) {
+            return Some(class);
+        }
+    }
+    let mut cursor = recv.walk();
+    for child in recv.children(&mut cursor) {
+        if child.kind() == "name" {
+            return php_type_name(child, content);
+        }
+    }
+    None
+}
+
+fn php_type_name(node: tree_sitter::Node, content: &str) -> Option<String> {
+    let text = node.utf8_text(content.as_bytes()).ok()?;
+    Some(
+        text.rsplit('\\')
+            .next()
+            .unwrap_or(text)
+            .to_string(),
+    )
 }
 
 fn java_type_name(node: tree_sitter::Node, content: &str) -> Option<String> {
@@ -514,6 +600,9 @@ fn path_matches(file: &str, module: &str) -> bool {
         || norm_file
             .strip_suffix(".java")
             .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".php")
+            .is_some_and(|s| norm_mod.starts_with(s))
 }
 
 fn push_lsp_edge(
@@ -614,6 +703,26 @@ mod tests {
         let edges = resolve_cross_file_calls(&symbols, &files);
         assert_eq!(edges.len(), 1);
         assert!(edges[0].dst_qn.starts_with("greeter/Greeter.java::"));
+        assert!(edges[0].dst_qn.contains("greet"));
+    }
+
+    #[test]
+    fn resolves_imported_php_class_method() {
+        let symbols = vec![
+            sym("main.php", "Function", "main", 4),
+            sym("greeter/Greeter.php", "Class", "Greeter", 3),
+            sym("greeter/Greeter.php", "Method", "greet", 4),
+        ];
+        let files = vec![SourceFile {
+            path: "main.php".into(),
+            language: "php".into(),
+            content: "<?php\nuse Greeter\\Greeter;\n\nfunction main() {\n    (new Greeter())->greet();\n}\n"
+                .into(),
+            line_count: 6,
+        }];
+        let edges = resolve_cross_file_calls(&symbols, &files);
+        assert_eq!(edges.len(), 1);
+        assert!(edges[0].dst_qn.starts_with("greeter/Greeter.php::"));
         assert!(edges[0].dst_qn.contains("greet"));
     }
 

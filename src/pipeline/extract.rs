@@ -124,6 +124,7 @@ fn language_for_ts(language: &str) -> Option<Language> {
         "java" => tree_sitter_java::LANGUAGE.into(),
         "c" => tree_sitter_c::LANGUAGE.into(),
         "cpp" => tree_sitter_cpp::LANGUAGE.into(),
+        "php" => tree_sitter_php::LANGUAGE_PHP_ONLY.into(),
         _ => return None,
     })
 }
@@ -168,6 +169,14 @@ fn query_for_language(language: &str) -> (&'static str, &'static str) {
             (method_declaration name: (identifier) @name) @definition
             (class_declaration name: (identifier) @name) @definition
             (interface_declaration name: (identifier) @name) @definition
+            "#,
+            "Function",
+        ),
+        "php" => (
+            r#"
+            (function_definition name: (name) @name) @definition
+            (method_declaration name: (name) @name) @definition
+            (class_declaration name: (name) @name) @definition
             "#,
             "Function",
         ),

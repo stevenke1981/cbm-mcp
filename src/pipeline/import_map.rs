@@ -27,6 +27,7 @@ impl ImportMap {
             }
             "go" => parse_go_imports(content, &mut map),
             "java" => parse_java_imports(content, &mut map),
+            "php" => parse_php_imports(content, &mut map),
             _ => {}
         }
         map
@@ -231,6 +232,34 @@ fn java_package_glob(package: &str) -> String {
     format!("{}/", package.replace('.', "/"))
 }
 
+fn parse_php_imports(content: &str, map: &mut ImportMap) {
+    let use_re =
+        Regex::new(r"(?m)^\s*use\s+([\w\\]+)(?:\s+as\s+(\w+))?\s*;").unwrap();
+    for cap in use_re.captures_iter(content) {
+        let path = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        if path.is_empty() {
+            continue;
+        }
+        let alias = cap.get(2).map(|m| m.as_str());
+        let class_name = alias.unwrap_or_else(|| path.rsplit('\\').next().unwrap_or(path));
+        let target = php_use_to_file(path);
+        map.bindings.insert(class_name.to_string(), target.clone());
+        map.modules.push(target);
+    }
+}
+
+fn php_use_to_file(use_path: &str) -> String {
+    let parts: Vec<&str> = use_path.split('\\').collect();
+    if parts.len() < 2 {
+        return format!("{use_path}.php");
+    }
+    let class_name = parts.last().copied().unwrap_or(use_path);
+    let pkg = parts[..parts.len() - 1]
+        .join("/")
+        .to_ascii_lowercase();
+    format!("{pkg}/{class_name}.php")
+}
+
 fn parse_go_imports(content: &str, map: &mut ImportMap) {
     let import_block = Regex::new(r#"import\s+(?:\(([^)]*)\)|"([^"]+)")"#).unwrap();
     for cap in import_block.captures_iter(content) {
@@ -279,6 +308,8 @@ fn path_matches_module(candidate_file: &str, module_path: &str) -> bool {
             .is_some_and(|stem| m.starts_with(stem))
         || c.strip_suffix(".java")
             .is_some_and(|stem| m.starts_with(stem))
+        || c.strip_suffix(".php")
+            .is_some_and(|stem| m.starts_with(stem))
         || m.strip_suffix('/')
             .is_some_and(|pkg| c.starts_with(pkg))
 }
@@ -294,6 +325,16 @@ mod tests {
         assert_eq!(
             map.bindings.get("helper").map(String::as_str),
             Some("utils.py")
+        );
+    }
+
+    #[test]
+    fn php_use_binds_class_to_namespace_path() {
+        let src = "<?php\nuse Greeter\\Greeter;\n\nfunction main() {}\n";
+        let map = ImportMap::parse("main.php", "php", src);
+        assert_eq!(
+            map.bindings.get("Greeter").map(String::as_str),
+            Some("greeter/Greeter.php")
         );
     }
 

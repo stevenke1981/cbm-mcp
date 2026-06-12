@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** PHP LSP · C# CALLS · confidence metadata on edges.
+**Next P0 slices:** C# CALLS AST · confidence metadata on edges · PHP require/autoload hardening.
 
-**Done recently:** class/impl `parent_class` + scoped method resolution · C CALLS AST · method disambiguation · C/PHP negative fixtures · `lsp_cross` Java · Py/JS/Go.
+**Done recently:** PHP LSP cross-file (`use` + `->method()`) · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -173,8 +173,8 @@ Acceptance criteria:
   - [x] Java AST pass
   - [~] C/C++ (C AST pass done; cpp shares query)
   - [ ] C#
-  - [ ] PHP
-- [~] Add LSP-assisted cross-file resolution where the reference uses it (Python/JS/TS/Go/Java `lsp_cross.rs` MVP).
+  - [~] PHP (tree-sitter extract + `lsp_cross` MVP; full `php_lsp.c` parity pending)
+- [~] Add LSP-assisted cross-file resolution where the reference uses it (Python/JS/TS/Go/Java/PHP `lsp_cross.rs` MVP).
 - [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).
 - [x] Add method vs free-function disambiguation (`CallTargetKind` + Method label in extract).
 - [x] Add class/impl/trait/interface method resolution (`parent_class` + scoped `resolve_kind_scoped`).

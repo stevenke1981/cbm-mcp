@@ -127,6 +127,41 @@ fn javascript_pipeline_resolves_imported_class_method_via_lsp_cross() {
 }
 
 #[test]
+fn php_pipeline_resolves_imported_class_method_via_lsp_cross() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir_all(dir.path().join("greeter")).unwrap();
+    std::fs::write(
+        dir.path().join("main.php"),
+        "<?php\nuse Greeter\\Greeter;\n\nfunction main() {\n    (new Greeter())->greet();\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("greeter/Greeter.php"),
+        "<?php\nnamespace Greeter;\n\nclass Greeter {\n    public function greet() {}\n}\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("decoy.php"), "<?php\nfunction greet() {}\n").unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("php-lsp-cross")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.php::") && e.src_qn.contains("::main@"))
+        .collect();
+    assert!(
+        main_calls
+            .iter()
+            .any(|e| e.dst_qn.contains("greet") && e.dst_qn.starts_with("greeter/Greeter.php::")),
+        "expected CALLS to greeter.Greeter.greet, got {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
 fn java_pipeline_resolves_imported_class_method_via_lsp_cross() {
     let (_guard, _cache, _) = isolated_cache();
     let dir = TempDir::new().unwrap();
