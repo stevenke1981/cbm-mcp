@@ -1,0 +1,45 @@
+{
+  "schema_version": "0.1",
+  "name": "codebase-memory-mcp",
+  "display_name": "codebase-memory-mcp",
+  "version": "0.1.0",
+  "transport": "stdio",
+  "command": "codebase-memory-mcp",
+  "args": [],
+  "env": {
+    "CBM_PROJECT_PREFIX": "cbm+",
+    "CBM_AGENT": "generic"
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": false,
+    "prompts": false
+  },
+  "tools": [
+    "index_repository",
+    "index_status",
+    "search_graph",
+    "trace_path",
+    "get_code_snippet",
+    "get_graph_schema",
+    "get_architecture",
+    "query_graph",
+    "search_code",
+    "list_projects",
+    "delete_project",
+    "detect_changes",
+    "manage_adr",
+    "ingest_traces"
+  ],
+  "install": {
+    "windows_binary": "target/release/codebase-memory-mcp.exe",
+    "unix_binary": "target/release/codebase-memory-mcp",
+    "recommended_command": "codebase-memory-mcp install --yes --all",
+    "manual_templates": [
+      "packaging/mcp/generic-mcp.json",
+      "packaging/mcp/codex-config.toml",
+      "packaging/mcp/opencode.json",
+      "packaging/mcp/claude-settings.json"
+    ]
+  }
+}

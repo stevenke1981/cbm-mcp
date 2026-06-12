@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cbrlm-mcp": {
+      "command": "{{CBRLM_BINARY}}",
+      "args": [],
+      "env": {
+        "CBRLM_PROJECT_PREFIX": "cbrlm+",
+        "CBRLM_AGENT": "generic"
+      }
+    }
+  }
+}
