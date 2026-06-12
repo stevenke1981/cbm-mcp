@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** C# CALLS AST · confidence metadata on edges · PHP require/autoload hardening.
+**Next P0 slices:** confidence metadata on edges · PHP require/autoload hardening.
 
-**Done recently:** PHP LSP cross-file (`use` + `->method()`) · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
+**Done recently:** C# CALLS AST (`tree-sitter` 0.25 + `invocation_expression`) · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -172,7 +172,7 @@ Acceptance criteria:
   - [x] Go AST pass
   - [x] Java AST pass
   - [~] C/C++ (C AST pass done; cpp shares query)
-  - [ ] C#
+  - [x] C# (tree-sitter `invocation_expression`; requires `tree-sitter` ≥ 0.25 for grammar ABI 15)
   - [~] PHP (tree-sitter extract + `lsp_cross` MVP; full `php_lsp.c` parity pending)
 - [~] Add LSP-assisted cross-file resolution where the reference uses it (Python/JS/TS/Go/Java/PHP `lsp_cross.rs` MVP).
 - [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).

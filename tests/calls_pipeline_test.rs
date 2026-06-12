@@ -19,8 +19,8 @@ fn calls_edges(store: &Store) -> Vec<codebase_memory_mcp::store::Edge> {
 
 fn has_call(store: &Store, caller_file: &str, caller: &str, callee: &str) -> bool {
     calls_edges(store).iter().any(|e| {
-        e.src_qn
-            .contains(&format!("{caller_file}::Function::{caller}@"))
+        e.src_qn.contains(&format!("{caller_file}::"))
+            && e.src_qn.contains(&format!("::{caller}@"))
             && e.dst_qn.contains(&format!("::{callee}@"))
     })
 }
@@ -248,6 +248,35 @@ fn php_pipeline_skips_ambiguous_cross_file_calls() {
     assert!(
         main_calls.is_empty(),
         "ambiguous cross-file helper in PHP should not link: {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
+
+#[test]
+fn csharp_pipeline_resolves_local_call_with_ast_metadata() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("App.cs"),
+        "class App {\n    static void Main() {\n        Helper();\n    }\n    static void Helper() {}\n}\n",
+    )
+    .unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("cs-ast-calls")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+    assert!(has_call(&store, "App.cs", "Main", "Helper"));
+
+    let edge = calls_edges(&store)
+        .into_iter()
+        .find(|e| e.dst_qn.contains("Helper"))
+        .expect("CALLS edge");
+    assert!(
+        edge.properties_json
+            .as_ref()
+            .is_some_and(|p| p.contains("ast")),
+        "expected AST metadata for C# CALLS"
     );
 
     let _ = codebase_memory_mcp::store::delete_project_db(&index.project);

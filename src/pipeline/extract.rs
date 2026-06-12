@@ -125,6 +125,7 @@ fn language_for_ts(language: &str) -> Option<Language> {
         "c" => tree_sitter_c::LANGUAGE.into(),
         "cpp" => tree_sitter_cpp::LANGUAGE.into(),
         "php" => tree_sitter_php::LANGUAGE_PHP_ONLY.into(),
+        "csharp" => tree_sitter_c_sharp::LANGUAGE.into(),
         _ => return None,
     })
 }
@@ -180,6 +181,14 @@ fn query_for_language(language: &str) -> (&'static str, &'static str) {
             "#,
             "Function",
         ),
+        "csharp" => (
+            r#"
+            (method_declaration name: (identifier) @name) @definition
+            (class_declaration name: (identifier) @name) @definition
+            (interface_declaration name: (identifier) @name) @definition
+            "#,
+            "Function",
+        ),
         "c" => (
             r#"
             (function_definition declarator: (function_declarator declarator: (identifier) @name)) @definition
@@ -228,7 +237,7 @@ fn language_looks_complete(sig: &str) -> bool {
 fn label_for_kind(kind: &str) -> Option<&'static str> {
     Some(match kind {
         "function_item" | "function_definition" | "function_declaration" => "Function",
-        "method_declaration" | "method_definition" => "Method",
+        "method_declaration" | "method_definition" | "constructor_declaration" => "Method",
         "struct_item"
         | "struct_specifier"
         | "class_specifier"
@@ -270,6 +279,14 @@ fn extract_symbols_regex(file_path: &str, language: &str, content: &str) -> Vec<
         "php" => &[
             (r"(?m)^\s*function\s+(\w+)", "Function"),
             (r"(?m)^\s*class\s+(\w+)", "Class"),
+        ],
+        "csharp" => &[
+            (
+                r"(?m)^\s*(?:public|private|protected|internal)?\s*(?:static\s+)?[\w<>,\s]+\s+(\w+)\s*\(",
+                "Method",
+            ),
+            (r"(?m)^\s*(?:public|private)?\s*class\s+(\w+)", "Class"),
+            (r"(?m)^\s*(?:public|private)?\s*interface\s+(\w+)", "Class"),
         ],
         "c" | "cpp" => &[
             (r"(?m)^\w[\w\s\*]*\s+(\w+)\s*\([^;]*\)\s*\{", "Function"),

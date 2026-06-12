@@ -34,7 +34,10 @@ pub fn resolve_calls_ast(
     let mut cursor = QueryCursor::new();
     let mut edges = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    let functions: Vec<&Symbol> = symbols.iter().filter(|s| s.label == "Function").collect();
+    let functions: Vec<&Symbol> = symbols
+        .iter()
+        .filter(|s| s.label == "Function" || s.label == "Method")
+        .collect();
 
     for sym in functions {
         let mut matches = cursor.matches(&query, tree.root_node(), content.as_bytes());
@@ -74,10 +77,14 @@ pub fn resolve_calls_ast(
                 continue;
             }
             let parent_class = parent_class_from_props(&sym.properties_json);
-            let res = if kind == CallTargetKind::Method {
-                resolver.resolve_kind_scoped(&callee, kind, parent_class.as_deref())
-            } else {
-                resolver.resolve_kind(&callee, kind)
+            let res = match (kind, parent_class.as_deref()) {
+                (CallTargetKind::Method, parent) => {
+                    resolver.resolve_kind_scoped(&callee, kind, parent)
+                }
+                (CallTargetKind::FreeFunction, Some(parent)) => resolver
+                    .resolve_kind_scoped(&callee, CallTargetKind::Method, Some(parent))
+                    .or_else(|| resolver.resolve_kind(&callee, kind)),
+                _ => resolver.resolve_kind(&callee, kind),
             };
             if let Some(res) = res {
                 push_edge(&mut edges, &mut seen, sym, &res, "ast");
@@ -97,6 +104,7 @@ fn language_to_tree_sitter(language: &str) -> Option<Language> {
         "java" => tree_sitter_java::LANGUAGE.into(),
         "c" => tree_sitter_c::LANGUAGE.into(),
         "cpp" => tree_sitter_cpp::LANGUAGE.into(),
+        "csharp" => tree_sitter_c_sharp::LANGUAGE.into(),
         _ => return None,
     })
 }
@@ -149,6 +157,13 @@ fn call_query_for(language: &str) -> Option<&'static str> {
     argument: (_)
     field: (field_identifier) @method))
 "#,
+        "csharp" => r#"
+(invocation_expression
+  function: (identifier) @callee)
+(invocation_expression
+  function: (member_access_expression
+    name: (identifier) @method))
+"#,
         _ => return None,
     })
 }
@@ -164,7 +179,36 @@ fn is_noise_callee(language: &str, name: &str) -> bool {
         "javascript" | "jsx" | "typescript" | "tsx" => {
             matches!(name, "if" | "for" | "while" | "return" | "console" | "require")
         }
+        "csharp" => matches!(name, "if" | "for" | "while" | "return" | "new" | "typeof" | "nameof"),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pipeline::calls::build_symbol_registry;
+    use crate::pipeline::extract::extract_symbols;
+    use crate::pipeline::registry::FileCallResolver;
+    use crate::pipeline::import_map::ImportMap;
+
+    #[test]
+    fn csharp_local_method_call_resolves() {
+        let src = "class App {\n    static void Main() {\n        Helper();\n    }\n    static void Helper() {}\n}\n";
+        let symbols = extract_symbols("App.cs", "csharp", src).unwrap();
+        assert!(
+            symbols.iter().any(|s| s.name == "Main"),
+            "symbols: {:?}",
+            symbols
+        );
+        let registry = build_symbol_registry(&symbols);
+        let imports = ImportMap::parse("App.cs", "csharp", src);
+        let mut resolver = FileCallResolver::new(&registry, "App.cs", imports);
+        let edges = resolve_calls_ast("csharp", &symbols, src, &mut resolver);
+        assert!(
+            !edges.is_empty(),
+            "expected AST edges; symbols={symbols:?}"
+        );
     }
 }
 

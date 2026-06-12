@@ -38,7 +38,7 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 streaming-iterator = "0.1"
-tree-sitter = "0.24"
+tree-sitter = "0.25"
 tree-sitter-c = "0.23"
 tree-sitter-cpp = "0.23"
 tree-sitter-go = "0.23"
@@ -51,6 +51,7 @@ uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 zstd = "0.13"
 tree-sitter-php = "0.23"
+tree-sitter-c-sharp = "0.23"
 
 [dev-dependencies]
 assert_cmd = "2"

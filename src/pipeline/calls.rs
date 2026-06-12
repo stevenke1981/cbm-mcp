@@ -28,7 +28,7 @@ pub fn resolve_calls_with_registry(
     if matches!(
         language,
         "rust" | "python" | "javascript" | "jsx" | "typescript" | "tsx" | "go" | "java" | "c"
-            | "cpp"
+            | "cpp" | "csharp"
     ) {
         let ast_edges = super::calls_ast::resolve_calls_ast(language, symbols, content, &mut resolver);
         if !ast_edges.is_empty() {
