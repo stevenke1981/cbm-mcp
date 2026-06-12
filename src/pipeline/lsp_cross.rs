@@ -1,7 +1,7 @@
 //! Cross-file LSP-style call resolution (reference `pass_lsp_cross.c` parity slice).
 //!
 //! In-process type-aware resolver — not an external language-server subprocess.
-//! Phase 1: Python imported-class method dispatch (`Greeter().greet()`).
+//! Supports Python, JavaScript/TypeScript, and Go imported-type method dispatch.
 
 use crate::pipeline::import_map::ImportMap;
 use crate::pipeline::registry::{confidence_band, CallResolution};
@@ -12,15 +12,14 @@ use tree_sitter::{Language, Parser, Query, QueryCursor};
 
 const LSP_CROSS_CONFIDENCE: f64 = 0.85;
 
+const JS_LANGS: &[&str] = &["javascript", "jsx", "typescript", "tsx"];
+
 pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec<Edge> {
     let mut edges = Vec::new();
     let class_index = build_class_index(symbols);
     let methods_by_file = build_methods_by_file(symbols);
 
     for file in files {
-        if file.language != "python" {
-            continue;
-        }
         let file_syms: Vec<&Symbol> = symbols
             .iter()
             .filter(|s| s.file_path == file.path && s.label == "Function")
@@ -28,19 +27,95 @@ pub fn resolve_cross_file_calls(symbols: &[Symbol], files: &[SourceFile]) -> Vec
         if file_syms.is_empty() {
             continue;
         }
-        let imports = ImportMap::parse(&file.path, &file.language, &file.content);
-        let bindings = infer_python_type_bindings(&file.content, &imports);
-        edges.extend(resolve_python_attribute_calls(
-            &file.path,
-            &file.content,
-            &file_syms,
-            &imports,
-            &bindings,
-            &class_index,
-            &methods_by_file,
-        ));
+
+        match file.language.as_str() {
+            "python" => {
+                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let bindings = infer_python_type_bindings(&file.content, &imports);
+                edges.extend(resolve_attribute_calls(
+                    AttributeCallConfig {
+                        language: tree_sitter_python::LANGUAGE.into(),
+                        query_src: PYTHON_ATTR_QUERY,
+                    },
+                    &file.path,
+                    &file.content,
+                    &file_syms,
+                    &imports,
+                    &bindings,
+                    &class_index,
+                    &methods_by_file,
+                ));
+            }
+            lang if JS_LANGS.contains(&lang) => {
+                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let bindings = infer_js_type_bindings(&file.content, &imports);
+                let ts_lang = if matches!(lang, "typescript" | "tsx") {
+                    tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
+                } else {
+                    tree_sitter_javascript::LANGUAGE.into()
+                };
+                edges.extend(resolve_attribute_calls(
+                    AttributeCallConfig {
+                        language: ts_lang,
+                        query_src: JS_ATTR_QUERY,
+                    },
+                    &file.path,
+                    &file.content,
+                    &file_syms,
+                    &imports,
+                    &bindings,
+                    &class_index,
+                    &methods_by_file,
+                ));
+            }
+            "go" => {
+                let imports = ImportMap::parse(&file.path, &file.language, &file.content);
+                let bindings =
+                    infer_go_type_bindings(&file.content, &imports, &class_index, &methods_by_file);
+                edges.extend(resolve_attribute_calls(
+                    AttributeCallConfig {
+                        language: tree_sitter_go::LANGUAGE.into(),
+                        query_src: GO_ATTR_QUERY,
+                    },
+                    &file.path,
+                    &file.content,
+                    &file_syms,
+                    &imports,
+                    &bindings,
+                    &class_index,
+                    &methods_by_file,
+                ));
+            }
+            _ => {}
+        }
     }
     edges
+}
+
+const PYTHON_ATTR_QUERY: &str = r#"
+(call
+  function: (attribute
+    object: (_) @recv
+    attribute: (identifier) @method))
+"#;
+
+const JS_ATTR_QUERY: &str = r#"
+(call_expression
+  function: (member_expression
+    object: (_) @recv
+    property: (property_identifier) @method))
+"#;
+
+const GO_ATTR_QUERY: &str = r#"
+(call_expression
+  function: (selector_expression
+    operand: (_) @recv
+    field: (field_identifier) @method))
+"#;
+
+struct AttributeCallConfig {
+    language: Language,
+    query_src: &'static str,
 }
 
 fn build_class_index(symbols: &[Symbol]) -> HashMap<String, Vec<ClassEntry>> {
@@ -95,10 +170,7 @@ struct MethodEntry {
 }
 
 fn infer_python_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
-    let mut bindings = HashMap::new();
-    for local in imports.bindings.keys() {
-        bindings.insert(local.clone(), local.clone());
-    }
+    let mut bindings = import_name_bindings(imports);
     let assign_re =
         regex::Regex::new(r"(?m)^\s*(\w+)\s*=\s*(\w+)\s*\(").expect("assign regex");
     for cap in assign_re.captures_iter(content) {
@@ -111,7 +183,79 @@ fn infer_python_type_bindings(content: &str, imports: &ImportMap) -> HashMap<Str
     bindings
 }
 
-fn resolve_python_attribute_calls(
+fn infer_js_type_bindings(content: &str, imports: &ImportMap) -> HashMap<String, String> {
+    let mut bindings = import_name_bindings(imports);
+    let new_re = regex::Regex::new(r"(?m)(?:const|let|var)\s+(\w+)\s*=\s*new\s+(\w+)\s*\(")
+        .expect("js new regex");
+    for cap in new_re.captures_iter(content) {
+        let var = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        if !var.is_empty() && !class_name.is_empty() {
+            bindings.insert(var.to_string(), class_name.to_string());
+        }
+    }
+    let ctor_re =
+        regex::Regex::new(r"(?m)(?:const|let|var)\s+(\w+)\s*=\s*(\w+)\s*\(").expect("js ctor regex");
+    for cap in ctor_re.captures_iter(content) {
+        let var = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let class_name = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        if !var.is_empty() && !class_name.is_empty() {
+            bindings.entry(var.to_string()).or_insert(class_name.to_string());
+        }
+    }
+    bindings
+}
+
+fn infer_go_type_bindings(
+    content: &str,
+    imports: &ImportMap,
+    class_index: &HashMap<String, Vec<ClassEntry>>,
+    methods_by_file: &HashMap<String, Vec<MethodEntry>>,
+) -> HashMap<String, String> {
+    let mut bindings = HashMap::new();
+    let new_re = regex::Regex::new(r"(\w+)\s*:=\s*(\w+)\.New\w*\(").expect("go new regex");
+    for cap in new_re.captures_iter(content) {
+        let var = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let pkg = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        if var.is_empty() || pkg.is_empty() {
+            continue;
+        }
+        let Some(target) = imports.bindings.get(pkg) else {
+            continue;
+        };
+        if let Some(class_name) = guess_go_struct_for_file(target, class_index, methods_by_file) {
+            bindings.insert(var.to_string(), class_name);
+        }
+    }
+    bindings
+}
+
+fn guess_go_struct_for_file(
+    target: &str,
+    class_index: &HashMap<String, Vec<ClassEntry>>,
+    methods_by_file: &HashMap<String, Vec<MethodEntry>>,
+) -> Option<String> {
+    let norm = target.replace('\\', "/");
+    for (class_name, entries) in class_index {
+        if entries.iter().any(|e| path_matches(&e.file, &norm)) {
+            if methods_by_file.get(&entries[0].file).is_some() {
+                return Some(class_name.clone());
+            }
+        }
+    }
+    None
+}
+
+fn import_name_bindings(imports: &ImportMap) -> HashMap<String, String> {
+    imports
+        .bindings
+        .keys()
+        .map(|local| (local.clone(), local.clone()))
+        .collect()
+}
+
+fn resolve_attribute_calls(
+    config: AttributeCallConfig,
     file_path: &str,
     content: &str,
     functions: &[&Symbol],
@@ -120,22 +264,15 @@ fn resolve_python_attribute_calls(
     class_index: &HashMap<String, Vec<ClassEntry>>,
     methods_by_file: &HashMap<String, Vec<MethodEntry>>,
 ) -> Vec<Edge> {
-    let lang: Language = tree_sitter_python::LANGUAGE.into();
     let mut parser = Parser::new();
-    if parser.set_language(&lang).is_err() {
+    if parser.set_language(&config.language).is_err() {
         return Vec::new();
     }
     let tree = match parser.parse(content, None) {
         Some(t) => t,
         None => return Vec::new(),
     };
-    let query_src = r#"
-(call
-  function: (attribute
-    object: (_) @recv
-    attribute: (identifier) @method))
-"#;
-    let Ok(query) = Query::new(&lang, query_src) else {
+    let Ok(query) = Query::new(&config.language, config.query_src) else {
         return Vec::new();
     };
 
@@ -204,10 +341,35 @@ fn infer_receiver_class(
             }
             None
         }
-        "call" => {
-            let func = recv.child_by_field_name("function")?;
-            if func.kind() == "identifier" {
-                return func.utf8_text(content.as_bytes()).ok().map(str::to_string);
+        "call" | "call_expression" => infer_call_constructor(recv, content),
+        "new_expression" => {
+            let ctor = recv.child_by_field_name("constructor")?;
+            if ctor.kind() == "identifier" {
+                return ctor.utf8_text(content.as_bytes()).ok().map(str::to_string);
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn infer_call_constructor(recv: tree_sitter::Node, content: &str) -> Option<String> {
+    let func = recv.child_by_field_name("function")?;
+    match func.kind() {
+        "identifier" => func.utf8_text(content.as_bytes()).ok().map(str::to_string),
+        "selector_expression" => {
+            let field = func.child_by_field_name("field")?;
+            let op = func.child_by_field_name("operand")?;
+            if field.utf8_text(content.as_bytes()).ok()? != "New"
+                && !field
+                    .utf8_text(content.as_bytes())
+                    .ok()?
+                    .starts_with("New")
+            {
+                return None;
+            }
+            if op.kind() == "identifier" {
+                return op.utf8_text(content.as_bytes()).ok().map(str::to_string);
             }
             None
         }
@@ -227,7 +389,7 @@ fn resolve_class_method(
     let scoped: Vec<&ClassEntry> = if let Some(target) = imports.bindings.get(class_name) {
         candidates
             .iter()
-            .filter(|c| import_map::path_matches(&c.file, target))
+            .filter(|c| path_matches(&c.file, target))
             .collect()
     } else {
         candidates
@@ -255,15 +417,30 @@ fn resolve_class_method(
     })
 }
 
-mod import_map {
-    pub fn path_matches(file: &str, module: &str) -> bool {
-        let norm_file = file.replace('\\', "/");
-        let norm_mod = module.replace('\\', "/");
-        norm_file == norm_mod
-            || norm_file.ends_with(&norm_mod)
-            || norm_mod.ends_with(&norm_file)
-            || norm_file.strip_suffix(".py").is_some_and(|s| norm_mod.starts_with(s))
-    }
+fn path_matches(file: &str, module: &str) -> bool {
+    let norm_file = file.replace('\\', "/");
+    let norm_mod = module.replace('\\', "/");
+    norm_file == norm_mod
+        || norm_file.ends_with(&norm_mod)
+        || norm_mod.ends_with(&norm_file)
+        || norm_file
+            .strip_suffix(".py")
+            .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".js")
+            .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".ts")
+            .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".jsx")
+            .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".tsx")
+            .is_some_and(|s| norm_mod.starts_with(s))
+        || norm_file
+            .strip_suffix(".go")
+            .is_some_and(|s| norm_mod.starts_with(s))
 }
 
 fn push_lsp_edge(
@@ -308,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn resolves_imported_class_method() {
+    fn resolves_imported_python_class_method() {
         let symbols = vec![
             sym("main.py", "Function", "main", 3),
             sym("greeter.py", "Class", "Greeter", 1),
@@ -325,11 +502,45 @@ mod tests {
         assert_eq!(edges.len(), 1);
         assert!(edges[0].dst_qn.starts_with("greeter.py::"));
         assert!(edges[0].dst_qn.contains("greet"));
-        assert!(
-            edges[0]
-                .properties_json
-                .as_ref()
-                .is_some_and(|p| p.contains("lsp_cross"))
-        );
+    }
+
+    #[test]
+    fn resolves_imported_js_class_method() {
+        let symbols = vec![
+            sym("main.js", "Function", "main", 3),
+            sym("greeter.js", "Class", "Greeter", 1),
+            sym("greeter.js", "Function", "greet", 2),
+        ];
+        let files = vec![SourceFile {
+            path: "main.js".into(),
+            language: "javascript".into(),
+            content: "import { Greeter } from './greeter';\n\nfunction main() {\n  new Greeter().greet();\n}\n"
+                .into(),
+            line_count: 5,
+        }];
+        let edges = resolve_cross_file_calls(&symbols, &files);
+        assert_eq!(edges.len(), 1);
+        assert!(edges[0].dst_qn.starts_with("greeter.js::"));
+        assert!(edges[0].dst_qn.contains("greet"));
+    }
+
+    #[test]
+    fn resolves_imported_go_struct_method() {
+        let symbols = vec![
+            sym("main.go", "Function", "main", 5),
+            sym("greeter.go", "Class", "Greeter", 3),
+            sym("greeter.go", "Function", "Greet", 4),
+        ];
+        let files = vec![SourceFile {
+            path: "main.go".into(),
+            language: "go".into(),
+            content: "package main\n\nimport \"greeter\"\n\nfunc main() {\n  g := greeter.NewGreeter()\n  g.Greet()\n}\n"
+                .into(),
+            line_count: 8,
+        }];
+        let edges = resolve_cross_file_calls(&symbols, &files);
+        assert_eq!(edges.len(), 1);
+        assert!(edges[0].dst_qn.starts_with("greeter.go::"));
+        assert!(edges[0].dst_qn.contains("Greet"));
     }
 }

@@ -143,7 +143,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 | Structure | [x] Project/Folder/File nodes · [ ] Package nodes |
 | Extract / definitions | [~] tree-sitter 7 langs · [ ] symbol registry |
 | Imports | [~] regex per language · [ ] import graph reachability |
-| Calls | [~] Rust AST · [~] regex fallback · [x] registry resolve · [~] LSP cross-file (Python MVP) |
+| Calls | [~] Rust AST · [~] regex fallback · [x] registry resolve · [~] LSP cross-file (Py/JS/Go MVP) |
 | Usages / TypeRef | [ ] `pass_usages` parity |
 | Inherits / Implements | [~] regex patterns |
 | Decorates | [~] attribute patterns |

@@ -91,3 +91,37 @@ fn python_pipeline_resolves_imported_class_method_via_lsp_cross() {
 
     let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
 }
+
+#[test]
+fn javascript_pipeline_resolves_imported_class_method_via_lsp_cross() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("main.js"),
+        "import { Greeter } from './greeter';\n\nfunction main() {\n  new Greeter().greet();\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("greeter.js"),
+        "export class Greeter {\n  greet() { return 'hi'; }\n}\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("decoy.js"), "export function greet() {}\n").unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("js-lsp-cross")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.js::Function::main@"))
+        .collect();
+    assert!(
+        main_calls
+            .iter()
+            .any(|e| e.dst_qn.contains("greet") && e.dst_qn.starts_with("greeter.js::")),
+        "expected CALLS to greeter.greet, got {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}
