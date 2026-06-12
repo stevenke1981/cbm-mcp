@@ -99,11 +99,16 @@ fn regex_fallback_marks_method_metadata() {
     let registry = build_name_registry(&symbols);
     let edges = resolve_calls_with_registry(&symbols[..1], src, "python", &registry, "a.py");
     assert_eq!(edges.len(), 1);
+    let props = edges[0]
+        .properties_json
+        .as_ref()
+        .expect("expected call resolution metadata");
+    let v: serde_json::Value = serde_json::from_str(props).unwrap();
+    assert_eq!(v["callee"], "helper");
+    assert!(v["confidence"].is_number());
+    assert_eq!(v["strategy"], "same_file");
+    assert_eq!(v["candidates"], 1);
     assert!(
-        edges[0]
-            .properties_json
-            .as_ref()
-            .is_some_and(|p| p.contains("regex") || p.contains("ast")),
-        "expected call resolution metadata"
+        v["method"].as_str() == Some("ast") || v["method"].as_str() == Some("regex")
     );
 }

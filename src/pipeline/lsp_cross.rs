@@ -4,7 +4,9 @@
 //! Supports Python, JavaScript/TypeScript, Go, and Java imported-type method dispatch.
 
 use crate::pipeline::import_map::ImportMap;
-use crate::pipeline::registry::{confidence_band, parent_class_from_props, CallResolution};
+use crate::pipeline::registry::{
+    call_edge_properties_json, confidence_band, parent_class_from_props, CallResolution,
+};
 use crate::store::{Edge, SourceFile, Symbol};
 use std::collections::{HashMap, HashSet};
 use streaming_iterator::StreamingIterator;
@@ -404,7 +406,7 @@ fn resolve_attribute_calls(
             ) else {
                 continue;
             };
-            push_lsp_edge(&mut edges, &mut seen, caller, &res);
+            push_lsp_edge(&mut edges, &mut seen, caller, &method_name, &res);
         }
     }
     edges
@@ -570,6 +572,7 @@ fn resolve_class_method(
         strategy: "lsp_cross".into(),
         confidence: LSP_CROSS_CONFIDENCE,
         band: confidence_band(LSP_CROSS_CONFIDENCE).to_string(),
+        candidates: class_methods.len(),
     })
 }
 
@@ -609,6 +612,7 @@ fn push_lsp_edge(
     edges: &mut Vec<Edge>,
     seen: &mut HashSet<(String, String)>,
     caller: &Symbol,
+    callee: &str,
     res: &CallResolution,
 ) {
     if res.qn == caller.qualified_name {
@@ -620,10 +624,7 @@ fn push_lsp_edge(
             src_qn: caller.qualified_name.clone(),
             dst_qn: res.qn.clone(),
             edge_type: "CALLS".into(),
-            properties_json: Some(format!(
-                r#"{{"confidence":"{}","method":"lsp_cross","strategy":"{}","score":{:.2}}}"#,
-                res.band, res.strategy, res.confidence
-            )),
+            properties_json: Some(call_edge_properties_json(callee, res, "lsp_cross")),
         });
     }
 }

@@ -591,7 +591,11 @@ fn edge_score(edge: &Edge) -> f64 {
     edge.properties_json
         .as_ref()
         .and_then(|p| serde_json::from_str::<serde_json::Value>(p).ok())
-        .and_then(|v| v.get("score").and_then(|s| s.as_f64()))
+        .and_then(|v| {
+            v.get("score")
+                .or_else(|| v.get("confidence"))
+                .and_then(|s| s.as_f64())
+        })
         .unwrap_or(0.0)
 }
 

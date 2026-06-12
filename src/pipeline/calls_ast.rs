@@ -1,5 +1,6 @@
 use crate::pipeline::registry::{
-    parent_class_from_props, CallResolution, CallTargetKind, FileCallResolver,
+    call_edge_properties_json, parent_class_from_props, CallResolution, CallTargetKind,
+    FileCallResolver,
 };
 use crate::store::{Edge, Symbol};
 use streaming_iterator::StreamingIterator;
@@ -87,7 +88,7 @@ pub fn resolve_calls_ast(
                 _ => resolver.resolve_kind(&callee, kind),
             };
             if let Some(res) = res {
-                push_edge(&mut edges, &mut seen, sym, &res, "ast");
+                push_edge(&mut edges, &mut seen, sym, &callee, &res, "ast");
             }
         }
     }
@@ -216,6 +217,7 @@ fn push_edge(
     edges: &mut Vec<Edge>,
     seen: &mut std::collections::HashSet<(String, String)>,
     caller: &Symbol,
+    callee: &str,
     res: &CallResolution,
     method: &str,
 ) {
@@ -228,10 +230,7 @@ fn push_edge(
             src_qn: caller.qualified_name.clone(),
             dst_qn: res.qn.clone(),
             edge_type: "CALLS".into(),
-            properties_json: Some(format!(
-                r#"{{"confidence":"{}","method":"{method}","strategy":"{}","score":{:.2}}}"#,
-                res.band, res.strategy, res.confidence
-            )),
+            properties_json: Some(call_edge_properties_json(callee, res, method)),
         });
     }
 }

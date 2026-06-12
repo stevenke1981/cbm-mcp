@@ -1,5 +1,7 @@
 use crate::pipeline::import_map::ImportMap;
-use crate::pipeline::registry::{CallTargetKind, FileCallResolver, SymbolRegistry};
+use crate::pipeline::registry::{
+    call_edge_properties_json, CallTargetKind, FileCallResolver, SymbolRegistry,
+};
 use crate::store::{Edge, Symbol};
 
 pub use crate::pipeline::registry::SymbolRegistry as Registry;
@@ -63,7 +65,7 @@ fn resolve_calls_regex(
     let lines: Vec<&str> = content.lines().collect();
 
     for sym in symbols {
-        if sym.label != "Function" {
+        if sym.label != "Function" && sym.label != "Method" {
             continue;
         }
         let start = sym.line_start.saturating_sub(1) as usize;
@@ -80,7 +82,18 @@ fn resolve_calls_regex(
                     if callee_name == sym.name || is_regex_noise(callee_name) {
                         continue;
                     }
-                    if let Some(res) = resolver.resolve_kind(callee_name, *kind) {
+                    let parent_class =
+                        crate::pipeline::registry::parent_class_from_props(&sym.properties_json);
+                    let res = match (*kind, parent_class.as_deref()) {
+                        (CallTargetKind::Method, parent) => {
+                            resolver.resolve_kind_scoped(callee_name, *kind, parent)
+                        }
+                        (CallTargetKind::FreeFunction, Some(parent)) => resolver
+                            .resolve_kind_scoped(callee_name, CallTargetKind::Method, Some(parent))
+                            .or_else(|| resolver.resolve_kind(callee_name, *kind)),
+                        _ => resolver.resolve_kind(callee_name, *kind),
+                    };
+                    if let Some(res) = res {
                         if res.qn == sym.qualified_name {
                             continue;
                         }
@@ -90,9 +103,8 @@ fn resolve_calls_regex(
                                 src_qn: key.0,
                                 dst_qn: key.1,
                                 edge_type: "CALLS".into(),
-                                properties_json: Some(format!(
-                                    r#"{{"confidence":"{}","method":"regex","strategy":"{}","score":{:.2}}}"#,
-                                    res.band, res.strategy, res.confidence
+                                properties_json: Some(call_edge_properties_json(
+                                    callee_name, &res, "regex",
                                 )),
                             });
                         }

@@ -24,6 +24,7 @@ pub struct CallResolution {
     pub strategy: String,
     pub confidence: f64,
     pub band: String,
+    pub candidates: usize,
 }
 
 /// Project-wide symbol registry for call resolution (reference `cbm_registry_t`).
@@ -155,6 +156,7 @@ impl SymbolRegistry {
                     &scoped[0],
                     "import_binding",
                     CONF_IMPORT_BINDING,
+                    scoped.len(),
                 ));
             }
         }
@@ -166,7 +168,12 @@ impl SymbolRegistry {
             .cloned()
             .collect();
         if same_file.len() == 1 {
-            return Some(resolution(&same_file[0], "same_file", CONF_SAME_FILE));
+            return Some(resolution(
+                &same_file[0],
+                "same_file",
+                CONF_SAME_FILE,
+                same_file.len(),
+            ));
         }
         if same_file.len() > 1 {
             return None;
@@ -181,7 +188,12 @@ impl SymbolRegistry {
             } else {
                 CONF_UNIQUE_NAME * 0.5
             };
-            return Some(resolution(&candidates[0], "unique_name", conf));
+            return Some(resolution(
+                &candidates[0],
+                "unique_name",
+                conf,
+                candidates.len(),
+            ));
         }
 
         if candidates.is_empty() {
@@ -200,6 +212,7 @@ impl SymbolRegistry {
                     &reachable[0],
                     "import_filtered",
                     CONF_IMPORT_FILTERED,
+                    reachable.len(),
                 ));
             }
             if reachable.len() > 1 {
@@ -208,6 +221,7 @@ impl SymbolRegistry {
                         best,
                         "import_filtered",
                         CONF_IMPORT_FILTERED_PENALTY,
+                        reachable.len(),
                     ));
                 }
                 return None;
@@ -240,13 +254,28 @@ pub fn confidence_band(score: f64) -> &'static str {
     }
 }
 
-fn resolution(qn: &str, strategy: &str, confidence: f64) -> CallResolution {
+fn resolution(qn: &str, strategy: &str, confidence: f64, candidates: usize) -> CallResolution {
     CallResolution {
         qn: qn.to_string(),
         strategy: strategy.to_string(),
         confidence,
         band: confidence_band(confidence).to_string(),
+        candidates,
     }
+}
+
+/// Standard CALLS edge metadata aligned with reference `pass_calls.c` properties.
+pub fn call_edge_properties_json(callee: &str, res: &CallResolution, method: &str) -> String {
+    serde_json::json!({
+        "callee": callee,
+        "confidence": res.confidence,
+        "strategy": res.strategy,
+        "candidates": res.candidates,
+        "method": method,
+        "band": res.band,
+        "score": res.confidence,
+    })
+    .to_string()
 }
 
 fn simple_name(qn: &str) -> String {
@@ -447,5 +476,19 @@ mod tests {
         ]);
         let imports = ImportMap::default();
         assert!(reg.resolve("helper", "main.rs", &imports).is_none());
+    }
+
+    #[test]
+    fn call_edge_properties_include_reference_fields() {
+        let res = resolution("main.py::Function::helper@1", "same_file", 0.90, 1);
+        let props = call_edge_properties_json("helper", &res, "ast");
+        let v: serde_json::Value = serde_json::from_str(&props).unwrap();
+        assert_eq!(v["callee"], "helper");
+        assert_eq!(v["confidence"], 0.90);
+        assert_eq!(v["strategy"], "same_file");
+        assert_eq!(v["candidates"], 1);
+        assert_eq!(v["method"], "ast");
+        assert_eq!(v["band"], "high");
+        assert_eq!(v["score"], 0.90);
     }
 }

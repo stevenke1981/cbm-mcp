@@ -14,9 +14,9 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** confidence metadata on edges · PHP require/autoload hardening.
+**Next P0 slices:** PHP require/autoload hardening.
 
-**Done recently:** C# CALLS AST (`tree-sitter` 0.25 + `invocation_expression`) · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
+**Done recently:** CALLS edge confidence metadata (`callee`/`confidence`/`strategy`/`candidates`) · C# CALLS AST · PHP LSP cross-file · class/impl `parent_class` · C CALLS AST · method disambiguation · `lsp_cross` Java · Py/JS/Go.
 
 Module inventory: [`docs/MODULE_MAP.md`](docs/MODULE_MAP.md) · Spec checklist: [`docs/IMPLEMENTATION_CHECKLIST.md`](docs/IMPLEMENTATION_CHECKLIST.md).
 
@@ -184,7 +184,7 @@ Acceptance criteria:
   - overloaded-like methods
   - imported aliases
   - framework callback names
-- [ ] Record confidence metadata in `properties_json`.
+- [x] Record confidence metadata in `properties_json` (`call_edge_properties_json`: callee, confidence, strategy, candidates, method, band).
 
 Acceptance criteria:
 
