@@ -28,7 +28,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 - [x] `tools/call` dispatch for 14 graph tools
 - [~] JSON-RPC error object shapes vs reference
 - [ ] Cancellation / shutdown mid-request behavior
-- [ ] Process-level MCP inspector smoke (stdio subprocess)
+- [x] Process-level MCP inspector smoke (`tests/mcp_process_test.rs`)
 - [x] Schema drift CI: `tests/mcp_tool_schema_test.rs`
 
 ### Tool: `index_repository`
@@ -143,7 +143,7 @@ Legend: `[x]` done · `[~]` partial/MVP · `[ ]` not started · `[-]` omitted/N/
 | Structure | [x] Project/Folder/File nodes · [ ] Package nodes |
 | Extract / definitions | [~] tree-sitter 7 langs · [ ] symbol registry |
 | Imports | [~] regex per language · [ ] import graph reachability |
-| Calls | [~] Rust AST · [~] regex fallback · [ ] registry resolve · [ ] LSP cross-file |
+| Calls | [~] Rust AST · [~] regex fallback · [x] registry resolve · [~] LSP cross-file (Python MVP) |
 | Usages / TypeRef | [ ] `pass_usages` parity |
 | Inherits / Implements | [~] regex patterns |
 | Decorates | [~] attribute patterns |

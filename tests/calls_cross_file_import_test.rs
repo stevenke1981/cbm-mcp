@@ -53,3 +53,41 @@ fn python_pipeline_resolves_imported_cross_file_helper() {
 
     let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
 }
+
+#[test]
+fn python_pipeline_resolves_imported_class_method_via_lsp_cross() {
+    let (_guard, _cache, _) = isolated_cache();
+    let dir = TempDir::new().unwrap();
+    std::fs::write(
+        dir.path().join("main.py"),
+        "from greeter import Greeter\n\ndef main():\n    Greeter().greet()\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("greeter.py"),
+        "class Greeter:\n    def greet(self):\n        return 'hi'\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("decoy.py"), "def greet():\n    pass\n").unwrap();
+
+    let pipeline = Pipeline::new(IndexMode::Full);
+    let index = pipeline.run(dir.path(), Some("py-lsp-cross")).unwrap();
+    let store = Store::open(&index.project).unwrap();
+
+    let main_calls: Vec<_> = calls_edges(&store)
+        .into_iter()
+        .filter(|e| e.src_qn.contains("main.py::Function::main@"))
+        .collect();
+    assert!(
+        main_calls.iter().any(|e| e.dst_qn.starts_with("greeter.py::")),
+        "expected CALLS to greeter.py method, got {main_calls:?}"
+    );
+    assert!(
+        main_calls
+            .iter()
+            .any(|e| e.dst_qn.contains("greet") && e.dst_qn.starts_with("greeter.py::")),
+        "expected CALLS to greeter.greet, got {main_calls:?}"
+    );
+
+    let _ = codebase_memory_mcp::store::delete_project_db(&index.project);
+}

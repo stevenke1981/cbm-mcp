@@ -14,7 +14,7 @@ Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `cod
 
 **Execution order:** this file = backlog · `PARITY_MATRIX.md` = public truth table · `CLONE_ROADMAP.md` = milestone map.
 
-**Next P0 slices:** LSP subprocess cross-file.
+**Next P0 slices:** LSP cross-file expansion (TS/Go/Java) · method disambiguation.
 
 **Done recently:** `manage_adr` mode=sections · project rename `cbm-mcp` · `SymbolRegistry` + import-map CALLS · `GraphBuffer` staging.
 
@@ -174,7 +174,7 @@ Acceptance criteria:
   - [ ] C/C++
   - [ ] C#
   - [ ] PHP
-- [ ] Add LSP-assisted cross-file resolution where the reference uses it.
+- [~] Add LSP-assisted cross-file resolution where the reference uses it (Python `lsp_cross.rs` MVP).
 - [x] Add alias/import-aware call resolution (`SymbolRegistry` + `ImportMap`).
 - [ ] Add method vs free-function disambiguation.
 - [ ] Add class/impl/trait/interface method resolution.

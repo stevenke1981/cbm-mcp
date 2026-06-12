@@ -7,6 +7,7 @@ mod graph_buffer;
 mod import_map;
 mod imports;
 mod inheritance;
+mod lsp_cross;
 mod registry;
 mod routes;
 mod structure;
@@ -543,7 +544,55 @@ fn rebuild_call_edges(graph: &GraphBuffer, code_symbols: &[Symbol]) -> Result<Ve
             ));
         }
     }
+    let cross = lsp_cross::resolve_cross_file_calls(code_symbols, &files);
+    edges = merge_call_edges(edges, cross);
     Ok(edges)
+}
+
+fn merge_call_edges(primary: Vec<Edge>, extra: Vec<Edge>) -> Vec<Edge> {
+    let mut by_key: HashMap<(String, String), Edge> = HashMap::new();
+    for edge in primary {
+        by_key.insert((edge.src_qn.clone(), edge.dst_qn.clone()), edge);
+    }
+    for edge in extra {
+        let key = (edge.src_qn.clone(), edge.dst_qn.clone());
+        match by_key.get(&key) {
+            Some(existing) if edge_prefers_lsp(&edge, existing) => {
+                by_key.insert(key, edge);
+            }
+            None => {
+                by_key.insert(key, edge);
+            }
+            _ => {}
+        }
+    }
+    by_key.into_values().collect()
+}
+
+fn edge_prefers_lsp(candidate: &Edge, existing: &Edge) -> bool {
+    let cand_lsp = edge_strategy(candidate).as_deref() == Some("lsp_cross");
+    let existing_lsp = edge_strategy(existing).as_deref() == Some("lsp_cross");
+    if cand_lsp && !existing_lsp {
+        return true;
+    }
+    edge_score(candidate) > edge_score(existing)
+}
+
+fn edge_strategy(edge: &Edge) -> Option<String> {
+    let props = edge.properties_json.as_ref()?;
+    serde_json::from_str::<serde_json::Value>(props)
+        .ok()?
+        .get("strategy")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+}
+
+fn edge_score(edge: &Edge) -> f64 {
+    edge.properties_json
+        .as_ref()
+        .and_then(|p| serde_json::from_str::<serde_json::Value>(p).ok())
+        .and_then(|v| v.get("score").and_then(|s| s.as_f64()))
+        .unwrap_or(0.0)
 }
 
 #[derive(Debug)]
