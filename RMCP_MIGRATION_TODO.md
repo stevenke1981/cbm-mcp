@@ -20,6 +20,10 @@ official `rmcp` server, stdio transport, typed Schemars parameters, and an
 official-client protocol test. The migration itself is complete; the remaining
 work is cancellation depth, release hardening, and optional capabilities.
 
+Release verification snapshot: `v0.2.3` was published from commit `7986d73`
+with five platform archives, `SHA256SUMS.txt`, successful default/fallback
+Windows installs, 14-tool OpenCode SDK validation, and `cbm connected`.
+
 ### Verified complete
 
 - [x] Official `rmcp` stdio server and `ServerHandler`.
@@ -95,21 +99,21 @@ Acceptance:
 The latest published tag may lag behind `main`. A source checkout using default
 `./install.ps1` installs the latest GitHub Release, not untagged code.
 
-- [ ] Bump `Cargo.toml`, `Cargo.lock`, `packaging/mcp/manifest.json`, installer
+- [x] Bump `Cargo.toml`, `Cargo.lock`, `packaging/mcp/manifest.json`, installer
   examples, and release metadata to the next patch version.
-- [ ] Run all required verification commands below.
-- [ ] Commit and push `main`.
-- [ ] Tag the exact tested commit and push the tag.
-- [ ] Wait for all GitHub Release archives and `SHA256SUMS.txt`.
-- [ ] On Windows, run default `./install.ps1` with no version and confirm the
+- [x] Run all required verification commands below.
+- [x] Commit and push `main`.
+- [x] Tag the exact tested commit and push the tag.
+- [x] Wait for all GitHub Release archives and `SHA256SUMS.txt`.
+- [x] On Windows, run default `./install.ps1` with no version and confirm the
   downloaded URL uses the new tag.
-- [ ] Force the GitHub API lookup to fail and confirm redirect fallback still
+- [x] Force the GitHub API lookup to fail and confirm redirect fallback still
   installs the same release.
-- [ ] Keep OpenCode running during one update and confirm locked-binary fallback
+- [x] Keep OpenCode running during one update and confirm locked-binary fallback
   configures the actual side-by-side executable.
-- [ ] Verify the default installer log contains no Cargo compilation output.
-- [ ] Run the OpenCode SDK smoke against the installed binary.
-- [ ] Run `opencode --pure mcp list` and confirm `cbm connected`.
+- [x] Verify the default installer log contains no Cargo compilation output.
+- [x] Run the OpenCode SDK smoke against the installed binary.
+- [x] Run `opencode --pure mcp list` and confirm `cbm connected`.
 - [ ] Start a fresh Codex session and confirm CBM tools are registered.
 
 Acceptance:
@@ -177,11 +181,11 @@ Acceptance:
 
 ## Documentation follow-up
 
-- [ ] Document side-by-side Windows updates and restart requirements.
-- [ ] Document GitHub API fallback and optional token use.
-- [ ] Add troubleshooting for `failed to get tools`, stdout pollution, stale
+- [x] Document side-by-side Windows updates and restart requirements.
+- [x] Document GitHub API fallback and optional token use.
+- [x] Add troubleshooting for `failed to get tools`, stdout pollution, stale
   command paths, invalid JSONC/TOML, permission failures, and locked binaries.
-- [ ] Update `PARITY_MATRIX.md` so protocol migration, cancellation, and graph
+- [x] Update `PARITY_MATRIX.md` so protocol migration, cancellation, and graph
   feature parity are separate claims.
 - [ ] Keep legacy `cbrlm` names only where migration compatibility requires them.
 
@@ -203,11 +207,11 @@ opencode --pure mcp list
 
 Also verify:
 
-- [ ] `cargo tree -i rmcp` resolves exactly one intended rmcp version.
-- [ ] `cbm --version` matches the release tag.
-- [ ] `cbm install --dry-run --all --json` emits valid JSON on stdout.
-- [ ] Default installers contain no implicit source-build fallback.
-- [ ] `git status --short` contains no generated cache, config, or test database.
+- [x] `cargo tree -i rmcp` resolves exactly one intended rmcp version.
+- [x] `cbm --version` matches the release tag.
+- [x] `cbm install --dry-run --all --json` emits valid JSON on stdout.
+- [x] Default installers contain no implicit source-build fallback.
+- [x] `git status --short` contains no generated cache, config, or test database.
 
 ## Completion definition
 
