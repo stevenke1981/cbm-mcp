@@ -3,7 +3,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/linux/install.sh | bash
-#   CBM_VERSION=v0.2.1 ./packaging/linux/install.sh
+#   CBM_VERSION=v0.2.2 ./packaging/linux/install.sh
 
 set -euo pipefail
 

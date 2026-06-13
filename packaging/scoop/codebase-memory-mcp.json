@@ -1,11 +1,11 @@
 {
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Rust codebase knowledge graph MCP server for AI coding agents",
     "homepage": "https://github.com/stevenke1981/cbm-mcp",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/stevenke1981/cbm-mcp/releases/download/v0.2.1/cbm-mcp-windows-x64.zip",
+            "url": "https://github.com/stevenke1981/cbm-mcp/releases/download/v0.2.2/cbm-mcp-windows-x64.zip",
             "hash": "sha256:UPDATE_FROM_RELEASE_SHA256SUMS"
         }
     },

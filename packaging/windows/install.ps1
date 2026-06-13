@@ -2,7 +2,7 @@
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/packaging/windows/install.ps1 | iex
-#   $env:CBM_VERSION = "v0.2.1"; .\packaging\windows\install.ps1
+#   $env:CBM_VERSION = "v0.2.2"; .\packaging\windows\install.ps1
 
 param(
     [string]$Version = $(if ($env:CBM_VERSION) { $env:CBM_VERSION } elseif ($env:CBRLM_VERSION) { $env:CBRLM_VERSION } else { "latest" }),
@@ -22,6 +22,9 @@ if ($Version -eq "latest") {
 
 $Url = "https://github.com/$Repo/releases/download/$Version/$Archive"
 $Tmp = Join-Path $env:TEMP "cbm-mcp-install"
+if (Test-Path -LiteralPath $Tmp) {
+    Remove-Item -LiteralPath $Tmp -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $Tmp, $InstallDir | Out-Null
 
 $ChecksumsUrl = "https://github.com/$Repo/releases/download/$Version/SHA256SUMS.txt"

@@ -2,7 +2,7 @@ class CodebaseMemoryMcp < Formula
   desc "Rust codebase knowledge graph MCP server for AI coding agents"
   homepage "https://github.com/stevenke1981/cbm-mcp"
   license "MIT"
-  version "0.2.1"
+  version "0.2.2"
 
   on_macos do
     on_arm do
