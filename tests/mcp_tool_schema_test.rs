@@ -58,6 +58,33 @@ fn property_keys(schema: &Value) -> BTreeSet<String> {
         .unwrap_or_default()
 }
 
+fn assert_no_boolean_property_schemas(value: &Value, path: &str) {
+    match value {
+        Value::Object(object) => {
+            if let Some(properties) = object.get("properties").and_then(Value::as_object) {
+                for (name, schema) in properties {
+                    assert!(
+                        !schema.is_boolean(),
+                        "OpenCode rejects boolean schema node at {path}.properties.{name}"
+                    );
+                }
+            }
+            if object.get("items").is_some_and(Value::is_boolean) {
+                panic!("OpenCode rejects boolean schema node at {path}.items");
+            }
+            for (key, child) in object {
+                assert_no_boolean_property_schemas(child, &format!("{path}.{key}"));
+            }
+        }
+        Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                assert_no_boolean_property_schemas(child, &format!("{path}[{index}]"));
+            }
+        }
+        _ => {}
+    }
+}
+
 fn compare_tool(runtime: &Value, spec: &Value, name: &str) -> Vec<String> {
     let mut errors = Vec::new();
 
@@ -116,6 +143,7 @@ fn runtime_tools_match_checked_in_specs() {
         let name = tool.get("name").and_then(|v| v.as_str()).unwrap();
         let spec = specs.get(name).unwrap();
         all_errors.extend(compare_tool(tool, spec, name));
+        assert_no_boolean_property_schemas(&tool["inputSchema"], name);
     }
 
     assert!(

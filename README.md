@@ -35,6 +35,12 @@ cd D:\cbm-mcp
 
 This downloads the latest release archive, verifies `SHA256SUMS.txt`, installs the binary to a stable config path, installs agent MCP config, and writes the session hooks.
 
+The installer uses `GITHUB_TOKEN` or `GH_TOKEN` when available. If the GitHub
+API is rate-limited, it resolves the latest tag through the public Release
+redirect instead of compiling from source. On Windows, a running agent may lock
+`cbm.exe`; the installer then uses a versioned side-by-side executable and
+updates agent config to the actual installed path.
+
 Unix:
 
 ```bash
@@ -44,11 +50,11 @@ Unix:
 Pin a version:
 
 ```powershell
-.\install.ps1 -Version v0.2.2
+.\install.ps1 -Version v0.2.3
 ```
 
 ```bash
-CBM_VERSION=v0.2.2 ./install.sh
+CBM_VERSION=v0.2.3 ./install.sh
 ```
 
 ### Build from source checkout
@@ -159,3 +165,18 @@ Use [`packaging/mcp/`](packaging/mcp/) for ready templates:
 Replace `{{CBM_BINARY}}` with the absolute path printed by `install.ps1` / `install.sh`, or use the stable installed binary path.
 
 Windows installs the executable as `%USERPROFILE%\.config\cbm-mcp\bin\cbm.exe`. The installer updates both existing `opencode.json` and `opencode.jsonc` files so stale legacy entries cannot override the new command.
+
+## Troubleshooting
+
+- `failed to get tools`: run the OpenCode SDK smoke from the
+  `rust-rmcp-mcp-server` skill against the configured binary, then check that
+  `opencode --pure mcp list` reports `cbm connected`.
+- `not connected`: confirm the configured absolute executable exists and run
+  `cbm --version`; restart the agent because MCP registrations load at session
+  start.
+- GitHub API rate limit: rerun the current installer; it falls back to the
+  public latest-release redirect. `GITHUB_TOKEN` or `GH_TOKEN` can also be set.
+- Locked `cbm.exe`: keep OpenCode open and rerun the installer. A versioned
+  executable may be installed; use the path printed in the install report.
+- Protocol parse failures: MCP mode must write only JSON-RPC frames to stdout.
+  Send diagnostics and tracing to stderr.

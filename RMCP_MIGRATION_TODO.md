@@ -1,279 +1,218 @@
-# Official rmcp MCP Server Migration Implementation Plan
+# CBM rmcp Migration and Hardening TODO
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Agent handoff document. Update checkboxes only after the listed acceptance test passes.
 
-**Goal:** Replace the custom CBM JSON-RPC/stdio implementation with the official Rust MCP SDK while preserving all graph behavior, tool contracts, installation paths, and release usability.
+**Repository:** `stevenke1981/cbm-mcp`
 
-**Architecture:** Keep the existing graph engine and `ToolHandler` as domain logic. Add a thin typed `rmcp` adapter that owns protocol negotiation, stdio framing, tool routing, input schemas, cancellation, and MCP errors. Remove the custom transport only after process-level parity tests pass.
+**Binary:** `cbm` / `cbm.exe`
 
-**Tech Stack:** Rust 2021, `rmcp 1.7.0`, Tokio, Serde, Schemars, SQLite, tree-sitter, existing CBM graph modules.
+**MCP config key:** `cbm`
 
----
+**MCP `serverInfo.name`:** `codebase-memory-mcp`
 
-## Status and hard decisions
+**Public tools:** 14
+**SDK baseline:** `rmcp 1.7.0`
 
-Implementation snapshot (2026-06-13): official `rmcp` stdio, `ServerHandler`,
-typed Schemars inputs, 14-tool router, SDK-generated schemas, protocol/process
-tests, and release artifact smoke are complete. Request cancellation propagation,
-optional resources, and progress notifications remain open below.
+## Current state
 
-- [x] Use the current official stable SDK: `rmcp = 1.7.0`.
-- [x] Pin the exact SDK version in `Cargo.lock`; update it only in a dedicated dependency change.
-- [x] Use `rmcp` server and stdio transport APIs. Do not maintain a second JSON-RPC parser or framing implementation.
-- [x] Keep the binary name `cbm` and MCP server name `codebase-memory-mcp`.
-- [x] Keep CBM independent from `D:\rlm-mcp`; do not add RLM tools or dependencies.
-- [x] Keep `.codebase-memory/graph.db.zst` and the existing SQLite/cache model as the persistent index contract.
-- [x] Preserve the current 14 graph tool names and response payloads unless a documented MCP compliance issue requires a versioned change.
-- [x] Write all logs and diagnostics to stderr. Stdout is reserved exclusively for MCP stdio frames.
-- [x] Do not advertise capabilities that are not implemented and tested.
+The custom JSON-RPC/stdio implementation has been removed. CBM now uses the
+official `rmcp` server, stdio transport, typed Schemars parameters, and an
+official-client protocol test. The migration itself is complete; the remaining
+work is cancellation depth, release hardening, and optional capabilities.
 
-## Current implementation to replace
+### Verified complete
 
-- `src/mcp/server.rs` manually parses requests, hard-codes protocol version `2024-11-05`, dispatches methods, and formats responses.
-- `src/mcp/transport.rs` manually reads/writes newline and `Content-Length` framed messages.
-- `src/mcp/tool_specs.rs` manually assembles JSON Schema as `serde_json::Value`.
-- `src/mcp/tools.rs` contains reusable graph-domain dispatch and should remain the behavioral compatibility layer during migration.
-- Existing protocol coverage lives in `tests/mcp_jsonrpc_test.rs`, `tests/mcp_process_test.rs`, and `tests/mcp_tool_schema_test.rs`.
+- [x] Official `rmcp` stdio server and `ServerHandler`.
+- [x] Tokio async executable entrypoint.
+- [x] Typed `#[tool_router]` methods for all 14 tools.
+- [x] `Deserialize + JsonSchema` inputs with unknown-field rejection.
+- [x] SDK-owned initialize negotiation and tools capability.
+- [x] Blocking graph work runs through `spawn_blocking`.
+- [x] Domain failures return MCP tool errors instead of terminating the server.
+- [x] Custom transport, framing, and manual JSON-RPC dispatcher removed.
+- [x] In-process official rmcp client initialize/list/call test.
+- [x] Compiled-process stdio initialize/list/call test.
+- [x] Release archive smoke uses the extracted binary.
+- [x] Stdout remains protocol-only in MCP mode.
+- [x] OpenCode-sensitive boolean JSON Schema nodes are normalized in the actual
+  `ServerHandler::list_tools()` and `get_tool()` responses.
+- [x] Schema regression test rejects boolean `properties.*` and `items` nodes.
+- [x] Release installers use checksums and do not compile by default.
+- [x] Release installers support `GITHUB_TOKEN`/`GH_TOKEN` and fall back from
+  GitHub API lookup to the public `/releases/latest` redirect.
+- [x] MCP manifest points to release installers and stable installed paths, not
+  `target/release`.
+- [x] Windows installation can report the actual installed binary as JSON.
+- [x] Windows locked executable fallback can configure agents to a side-by-side
+  versioned `cbm-<version>.exe` path.
 
-## Target file map
+## P0 - Finish request cancellation correctly
 
-- Modify: `Cargo.toml` - add official SDK/schema dependencies and Tokio features.
-- Modify: `src/main.rs` - run the MCP server from an async Tokio main without writing non-protocol output to stdout.
-- Replace: `src/mcp/server.rs` - implement `ServerHandler`, server metadata, capabilities, lifecycle, and stdio serving.
-- Create: `src/mcp/router.rs` - define the `#[tool_router]` adapter and typed tool entrypoints.
-- Create: `src/mcp/params.rs` - define `Deserialize + JsonSchema` input structs for all 14 tools.
-- Modify: `src/mcp/tools.rs` - expose typed/domain calls or retain a single compatibility dispatcher without protocol concerns.
-- Modify: `src/mcp/mod.rs` - export the new server/router/parameter modules.
-- Delete after parity: `src/mcp/transport.rs` and `src/mcp/tool_specs.rs`.
-- Create: `tests/rmcp_protocol_test.rs` - SDK-level initialize, negotiation, list, call, cancellation, and error tests.
-- Modify: `tests/mcp_process_test.rs` - test the compiled binary over stdio.
-- Modify: `tests/mcp_tool_schema_test.rs` - compare SDK-generated schemas with checked-in public contracts.
-- Modify: `scripts/smoke-release-artifact.ps1` - test the extracted binary as an MCP server.
-- Modify: `scripts/smoke-release-artifact.sh` - mirror the release MCP smoke on Unix.
-- Modify: `README.md` and `packaging/mcp/README.md` - document official SDK transport and troubleshooting.
+This is the only remaining protocol-level migration blocker. Do not mark it
+complete merely because closing the client stops the service.
 
-## P0 Task 1 - Add the SDK dependency baseline
-
-- [ ] Add these dependencies to `Cargo.toml`:
-
-```toml
-rmcp = { version = "1.7.0", features = ["server", "transport-io", "macros"] }
-schemars = "1"
-tokio = { version = "1", features = ["full"] }
-```
-
-- [ ] Remove obsolete Tokio feature declarations rather than keeping duplicate `tokio` entries.
-- [ ] Run `cargo check` and record any SDK API adjustment in this file before broad code changes.
-- [ ] Run `cargo tree -i rmcp` and verify exactly one `rmcp` version is selected.
-- [ ] Commit only the dependency baseline and lockfile update.
+- [ ] Add `tokio-util = "0.7"` and accept `CancellationToken` in all 14 router
+  methods.
+- [ ] Race each `spawn_blocking` join handle against `cancellation.cancelled()`
+  with `tokio::select!`.
+- [ ] Return a stable cancellation error and never emit a late success response.
+- [ ] Add a protocol test that starts a deliberately slow tool request, sends
+  `notifications/cancelled`, and proves bounded response/shutdown time.
+- [ ] Keep the server usable after cancellation by calling a second lightweight
+  tool in the same session.
 
 Acceptance:
 
-- `cargo check` succeeds with `rmcp 1.7.0`.
-- No custom server behavior changes in this task.
+- Cancellation is observably different from an internal failure.
+- The client receives no success result for the cancelled request.
+- A later `list_projects` or `index_status` request succeeds.
 
-## P0 Task 2 - Lock the public tool contract before migration
+## P0 - Add cooperative pipeline cancellation
 
-- [ ] Update the schema snapshot test to assert exactly these tools:
-  - `index_repository`
-  - `index_status`
-  - `search_graph`
-  - `trace_path`
-  - `get_code_snippet`
-  - `get_graph_schema`
-  - `get_architecture`
-  - `query_graph`
-  - `search_code`
-  - `list_projects`
-  - `delete_project`
-  - `detect_changes`
-  - `manage_adr`
-  - `ingest_traces`
-- [ ] Snapshot each tool name, description, required fields, defaults, enums, and top-level `type: object`.
-- [ ] Add a response compatibility fixture for one read tool, one write/index tool, one pagination tool, and one validation failure.
-- [ ] Run the tests against the current custom server first; they must pass before adapter work begins.
+Request-level cancellation does not stop a blocking worker by itself. Thread a
+cooperative signal through graph work before claiming safe index cancellation.
+
+- [ ] Introduce a small domain cancellation abstraction that is independent of
+  rmcp types.
+- [ ] Check cancellation between discovery, extraction, edge passes, semantic
+  passes, persistence, and trace batches.
+- [ ] Stop scheduling new Rayon or worker tasks after cancellation.
+- [ ] Preserve the previous valid database when a full index is cancelled.
+- [ ] Roll back the active bulk transaction on cancellation.
+- [ ] Release watcher/pipeline busy guards on every cancellation path.
+- [ ] Add a slow fixture that cancels full indexing and then reopens and queries
+  the prior graph.
+- [ ] Add equivalent coverage for incremental indexing and `ingest_traces`.
 
 Acceptance:
 
-- A tool rename, missing required field, changed default, or response envelope drift fails CI.
-- The snapshot is a public contract, not generated documentation that silently overwrites itself.
+- Cancelled indexing leaves no corrupt or half-published graph.
+- Locks and watcher state are released.
+- A subsequent index can start immediately.
 
-## P0 Task 3 - Define typed tool inputs with Schemars
+## P0 - Publish and test the first post-migration release
 
-- [ ] Create one Rust input struct per tool in `src/mcp/params.rs`.
-- [ ] Derive `Debug`, `Clone`, `Deserialize`, and `JsonSchema` for every input type.
-- [ ] Use `#[serde(default)]` and Schemars metadata so runtime defaults and advertised defaults are identical.
-- [ ] Use enums for closed sets such as index mode, ADR mode, trace direction, and search mode.
-- [ ] Preserve optional versus required fields from the locked schema tests.
-- [ ] Reject unknown or ill-typed fields with an MCP invalid-params error instead of silently coercing them.
-- [ ] Add unit tests that deserialize minimum valid input, full input, invalid enum input, and missing required input for every parameter family.
+The latest published tag may lag behind `main`. A source checkout using default
+`./install.ps1` installs the latest GitHub Release, not untagged code.
 
-Acceptance:
-
-- No hand-written tool input JSON Schema remains.
-- SDK-generated schema passes the locked public schema tests.
-
-## P0 Task 4 - Add the rmcp tool router adapter
-
-- [ ] Create `src/mcp/router.rs` with `#[tool_router]` and one typed method per public tool.
-- [ ] Keep graph algorithms, storage, indexing, and watcher logic outside the router.
-- [ ] Convert typed parameters into existing domain calls in `ToolHandler`.
-- [ ] Return structured MCP content with the existing JSON payload serialized as text for backward compatibility.
-- [ ] Centralize response conversion so every tool consistently sets content and `isError` semantics.
-- [ ] Prevent a panic in one tool from terminating the stdio server; return an internal tool failure and log details to stderr.
-
-Acceptance:
-
-- `tools/list` is generated from the router and Schemars types.
-- All 14 tools reach the existing domain implementation through typed entrypoints.
-- No protocol request parsing exists in `ToolHandler`.
-
-## P0 Task 5 - Implement ServerHandler and capability negotiation
-
-- [ ] Replace the manual initialize response with an official `ServerHandler` implementation.
-- [ ] Return server info with:
-  - name: `codebase-memory-mcp`
-  - version: `env!("CARGO_PKG_VERSION")`
-  - concise instructions describing index, search, trace, and query workflow
-- [ ] Declare tools capability through the SDK builder.
-- [ ] Set `listChanged` only if the implementation can actually emit tool-list change notifications.
-- [ ] Let `rmcp` negotiate the protocol version; remove the hard-coded protocol version from application code.
-- [ ] Do not advertise resources, prompts, logging, completion, or subscriptions until each has an implementation and conformance test.
-- [ ] Add an initialize test using at least the newest protocol supported by `rmcp` and one older client version accepted by the SDK.
+- [ ] Bump `Cargo.toml`, `Cargo.lock`, `packaging/mcp/manifest.json`, installer
+  examples, and release metadata to the next patch version.
+- [ ] Run all required verification commands below.
+- [ ] Commit and push `main`.
+- [ ] Tag the exact tested commit and push the tag.
+- [ ] Wait for all GitHub Release archives and `SHA256SUMS.txt`.
+- [ ] On Windows, run default `./install.ps1` with no version and confirm the
+  downloaded URL uses the new tag.
+- [ ] Force the GitHub API lookup to fail and confirm redirect fallback still
+  installs the same release.
+- [ ] Keep OpenCode running during one update and confirm locked-binary fallback
+  configures the actual side-by-side executable.
+- [ ] Verify the default installer log contains no Cargo compilation output.
+- [ ] Run the OpenCode SDK smoke against the installed binary.
+- [ ] Run `opencode --pure mcp list` and confirm `cbm connected`.
+- [ ] Start a fresh Codex session and confirm CBM tools are registered.
 
 Acceptance:
 
-- Initialization succeeds through an official `rmcp` client/service test.
-- Unsupported capabilities are absent from the response.
-- Protocol version selection is owned by the SDK.
+- A machine with no Rust toolchain can install and connect.
+- The release binary exposes exactly 14 tools.
+- OpenCode and Codex configs point to an existing installed executable.
 
-## P0 Task 6 - Move stdio serving and shutdown to Tokio/rmcp
+## P1 - Strengthen public tool contracts
 
-- [ ] Make the executable entrypoint async with `#[tokio::main]`.
-- [ ] Serve the CBM handler with `rmcp` stdio transport and wait for service completion.
-- [ ] Treat stdin EOF as graceful shutdown.
-- [ ] Stop the watcher and release graph resources when the MCP service exits.
-- [ ] Propagate Ctrl+C/shutdown into the existing `Shutdown` abstraction.
-- [ ] Ensure indexing work that blocks a Tokio worker is moved to `spawn_blocking` or an owned worker thread.
-- [ ] Add a process test proving the server exits after stdin closes and leaves no watcher thread running.
-
-Acceptance:
-
-- OpenCode, Codex, and a process test can initialize and list tools over stdio.
-- The process shuts down cleanly on EOF and Ctrl+C.
-- Stdout contains no banners, logs, progress messages, or panic text.
-
-## P0 Task 7 - Implement spec-correct error boundaries
-
-- [ ] Map malformed tool arguments to JSON-RPC/MCP invalid params.
-- [ ] Let the SDK return method-not-found for unsupported protocol methods.
-- [ ] Return unknown tool names using the SDK's tool-call error contract.
-- [ ] Return domain failures such as missing project/session, invalid path, unsafe SQL, or index failure as tool execution errors with `isError: true` when the request itself is valid.
-- [ ] Keep internal error details in stderr logs; return stable, actionable messages without Rust backtraces or secrets.
-- [ ] Distinguish cancellation from internal failure.
-- [ ] Add tests for parse failure, invalid params, unknown method, unknown tool, domain error, cancellation, and unexpected internal error.
+- [ ] Replace stringly typed closed fields with enums where compatibility allows:
+  index mode, trace direction, search mode, and ADR mode.
+- [ ] Lock defaults and enums in checked-in schema fixtures, not only property
+  names and required fields.
+- [ ] Add minimum/full/invalid input tests for each parameter family.
+- [ ] Add response fixtures for one index tool, one read tool, one pagination
+  tool, and one domain error.
+- [ ] Add tests for unknown method, unknown tool, malformed JSON, invalid params,
+  domain error, and post-error server reuse.
+- [ ] Keep tool descriptions action-oriented and explicit about required index
+  state, output limits, and read/write effects.
 
 Acceptance:
 
-- Protocol errors and tool execution errors are not conflated.
-- Every failure produces a valid MCP response and the server remains usable afterward.
+- Tool name, description, required fields, defaults, enums, and representative
+  response envelopes cannot drift silently.
 
-## P0 Task 8 - Cancellation and long-running indexing
+## P1 - Service lifetime and watcher hardening
 
-- [ ] Read the request cancellation signal/context supplied by `rmcp` for long-running tool calls.
-- [ ] Thread cancellation into `index_repository`, incremental indexing, trace ingestion, and other long operations.
-- [ ] Stop scheduling new pipeline passes after cancellation.
-- [ ] Roll back or preserve the previous valid graph when cancellation interrupts a bulk transaction.
-- [ ] Emit no late success response after a request has been cancelled.
-- [ ] Add a fixture that starts a deliberately slow index, sends cancellation, and verifies bounded shutdown time and database integrity.
-
-Acceptance:
-
-- Cancellation does not corrupt `.codebase-memory` state.
-- A cancelled request releases locks and permits a later index/query call.
-
-## P0 Task 9 - Remove the custom protocol stack
-
-- [ ] Delete `src/mcp/transport.rs` after SDK process tests pass on Windows and Unix CI.
-- [ ] Delete `src/mcp/tool_specs.rs` after generated schemas pass snapshots.
-- [ ] Remove manual JSON-RPC constants, response formatting, initialize dispatch, ping dispatch, and `tools/list` dispatch.
-- [ ] Keep only domain-level JSON conversion that is part of the public tool result.
-- [ ] Run `rg` for `Content-Length`, `protocolVersion`, `tools/list`, `format_response`, and `format_error`; remaining matches must be tests/docs or SDK usage.
-
-Acceptance:
-
-- There is exactly one MCP protocol implementation: `rmcp`.
-- The CBM codebase does not parse raw JSON-RPC requests itself.
-
-## P0 Task 10 - Protocol and release artifact verification
-
-- [ ] Add an in-process SDK conformance test for initialize, ping, tools/list, and tools/call.
-- [ ] Keep a compiled-process stdio test to catch stdout pollution and executable wiring errors.
-- [ ] Update release smoke scripts to run initialize and tools/list against the extracted `cbm`/`cbm.exe`, not `target/release`.
-- [ ] Verify install dry-run produces the stable installed binary path and correct OpenCode/Codex command.
-- [ ] Add Windows JSONC and Codex TOML configuration smoke tests.
-- [ ] Test a real index followed by `search_graph`, `trace_path`, and `query_graph` through MCP.
-
-Acceptance:
-
-- A release archive is proven usable without Cargo or a source checkout.
-- OpenCode and Codex connect using the installed stable path.
-
-## P1 Task 11 - Optional MCP resources, only after tools are stable
-
-- [ ] Write a short design decision before adding resources.
-- [ ] If resources are useful, start with read-only URIs for graph schema, architecture summary, and project status.
-- [ ] Define URI templates, MIME types, size limits, and stale-index behavior.
-- [ ] Add list/read/resource-template tests before enabling the resources capability.
-- [ ] Do not expose the SQLite database file or unrestricted local files as resources.
-
-Acceptance:
-
-- The resources capability is absent until all resource operations are implemented.
-- Resource reads enforce project boundaries and output limits.
-
-## P1 Task 12 - Auto-sync and notifications
-
-- [ ] Keep auto-sync opt-in and preserve current watcher configuration.
-- [ ] Integrate watcher startup/stop with the `rmcp` service lifetime.
-- [ ] Debounce file events and avoid concurrent indexes of the same project.
-- [ ] Consider resource/tool change notifications only when a client-visible contract actually changes.
-- [ ] Add tests for stdin close during watcher activity and cancellation during incremental indexing.
+- [ ] Add a process test proving stdin EOF stops the watcher and exits promptly.
+- [ ] Add a Ctrl+C process test on Windows and Unix CI.
+- [ ] Debounce file events and serialize indexing per project.
+- [ ] Test stdin close during watcher activity.
+- [ ] Test cancellation during watcher-triggered incremental indexing.
+- [ ] Confirm no watcher thread survives process exit.
 
 Acceptance:
 
 - Auto-sync cannot outlive the MCP process.
-- Repeated file events produce bounded, serialized indexing work.
+- Repeated events create bounded indexing work.
 
-## P1 Task 13 - Documentation and migration notes
+## P2 - Optional MCP resources
 
-- [ ] Update `README.md` architecture and installation sections to state that CBM uses the official Rust MCP SDK.
-- [ ] Document that MCP runs on stdio and stdout must remain protocol-only.
-- [ ] Document cache/index location and watcher behavior.
-- [ ] Add troubleshooting for client timeout, stale command path, stdout pollution, invalid config, and permission errors.
-- [ ] Update `PARITY_MATRIX.md` to mark official SDK migration separately from graph feature parity.
-- [ ] Add a changelog/release note warning maintainers not to restore the custom transport.
+Resources remain intentionally disabled until fully implemented and tested.
+
+- [ ] Write an ADR before enabling the resources capability.
+- [ ] Start with read-only graph schema, architecture, and project-status URIs.
+- [ ] Define URI templates, MIME types, size limits, project boundaries, and
+  stale-index behavior.
+- [ ] Add list/read/template tests before advertising resources.
+- [ ] Never expose the SQLite file or unrestricted local filesystem paths.
 
 Acceptance:
 
-- Humans and agents can install, diagnose, and verify the MCP server without reading Rust source.
+- Capability negotiation stays honest.
+- Resource reads enforce project boundaries and output limits.
 
-## Required verification before completion
+## P2 - Progress notifications
 
-- [ ] `cargo fmt --check`
-- [ ] `cargo test --all-targets`
-- [ ] `cargo clippy --all-targets -- -D warnings`
-- [ ] `cargo build --release`
-- [ ] `cargo tree -i rmcp` shows `rmcp 1.7.0`
-- [ ] `cargo test --test rmcp_protocol_test`
-- [ ] `cargo test --test mcp_process_test`
-- [ ] `cargo test --test mcp_tool_schema_test`
-- [ ] `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-quality-gates.ps1 -SkipBuild`
-- [ ] `powershell -ExecutionPolicy Bypass -File .\scripts\smoke-release-artifact.ps1 -SkipBuild`
-- [ ] Fresh OpenCode connection smoke using the installed binary
-- [ ] Fresh Codex connection smoke using the installed binary
-- [ ] `git status --short` contains no generated cache, local config, or test database files
+- [ ] Define stable indexing phases and progress units.
+- [ ] Emit progress only when the request includes a progress token.
+- [ ] Rate-limit notifications to avoid flooding stdio clients.
+- [ ] Stop notifications immediately after cancellation or completion.
+- [ ] Add official-client tests for ordering and terminal state.
+
+## Documentation follow-up
+
+- [ ] Document side-by-side Windows updates and restart requirements.
+- [ ] Document GitHub API fallback and optional token use.
+- [ ] Add troubleshooting for `failed to get tools`, stdout pollution, stale
+  command paths, invalid JSONC/TOML, permission failures, and locked binaries.
+- [ ] Update `PARITY_MATRIX.md` so protocol migration, cancellation, and graph
+  feature parity are separate claims.
+- [ ] Keep legacy `cbrlm` names only where migration compatibility requires them.
+
+## Required verification
+
+Run from the repository root:
+
+```powershell
+cargo fmt --check
+cargo test --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo build --release
+cargo tree -i rmcp
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-quality-gates.ps1 -SkipBuild
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-release-artifact.ps1 -SkipBuild
+powershell -ExecutionPolicy Bypass -File C:\Users\steven\.codex\skills\rust-rmcp-mcp-server\scripts\opencode_tools_list_smoke.ps1 -Binary .\target\release\cbm.exe
+opencode --pure mcp list
+```
+
+Also verify:
+
+- [ ] `cargo tree -i rmcp` resolves exactly one intended rmcp version.
+- [ ] `cbm --version` matches the release tag.
+- [ ] `cbm install --dry-run --all --json` emits valid JSON on stdout.
+- [ ] Default installers contain no implicit source-build fallback.
+- [ ] `git status --short` contains no generated cache, config, or test database.
 
 ## Completion definition
 
-The migration is complete only when the custom transport and manual protocol dispatcher are gone, all 14 tools retain their locked contracts, SDK negotiation and errors pass conformance tests, long-running indexes cancel safely, and release-installed binaries connect from OpenCode and Codex without recompilation.
+The rmcp migration is complete when official SDK transport/router behavior,
+OpenCode-compatible schemas, release-installed binaries, request cancellation,
+cooperative index cancellation, and service shutdown all pass their acceptance
+tests. Graph feature parity with the upstream project remains a separate track
+owned by `PARITY_MATRIX.md` and must not be inferred from MCP protocol completion.

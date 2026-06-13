@@ -1,6 +1,7 @@
 use crate::agent::AgentKind;
 use crate::error::{Error, Result};
 use crate::hooks::{CODEX_HOOK_BEGIN, CODEX_HOOK_END, CODEX_SESSION_REMINDER_CMD};
+use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::fs;
 use std::io::{self, Write};
@@ -19,7 +20,7 @@ pub struct InstallOptions {
     pub binary: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct InstallReport {
     pub binary_path: PathBuf,
     pub configured: Vec<String>,
@@ -76,23 +77,25 @@ pub fn run_install(opts: &InstallOptions) -> Result<InstallReport> {
     let source = resolve_source_binary(opts.binary.as_deref())?;
     let dest = installed_binary_path();
 
-    if opts.dry_run {
+    let installed = if opts.dry_run {
         eprintln!(
             "[dry-run] would copy {} → {}",
             source.display(),
             dest.display()
         );
+        dest
     } else {
-        install_binary(&source, &dest)?;
-        eprintln!("installed binary → {}", dest.display());
-    }
+        let installed = install_binary(&source, &dest)?;
+        eprintln!("installed binary → {}", installed.display());
+        installed
+    };
 
     let targets = select_targets(opts.all_agents);
     let mut configured = Vec::new();
     let mut skipped = Vec::new();
 
     for target in targets {
-        match configure_agent(&target, &dest, opts) {
+        match configure_agent(&target, &installed, opts) {
             Ok(true) => configured.push(target.label().to_string()),
             Ok(false) => skipped.push(format!("{} (already configured)", target.label())),
             Err(e) => skipped.push(format!("{} ({e})", target.label())),
@@ -110,7 +113,7 @@ pub fn run_install(opts: &InstallOptions) -> Result<InstallReport> {
         eprintln!("skipped: {line}");
     }
 
-    let hooks_installed = match install_hooks(&dest, opts) {
+    let hooks_installed = match install_hooks(&installed, opts) {
         Ok(true) => {
             eprintln!("installed hooks → {}", hooks_dir().display());
             true
@@ -123,7 +126,7 @@ pub fn run_install(opts: &InstallOptions) -> Result<InstallReport> {
     };
 
     Ok(InstallReport {
-        binary_path: dest,
+        binary_path: installed,
         configured,
         skipped,
         hooks_installed,
@@ -209,13 +212,13 @@ fn resolve_source_binary(override_path: Option<&Path>) -> Result<PathBuf> {
     Err(Error::Other("could not resolve cbm binary path".into()))
 }
 
-fn install_binary(source: &Path, dest: &Path) -> Result<()> {
+fn install_binary(source: &Path, dest: &Path) -> Result<PathBuf> {
     if source == dest
         || (source.exists()
             && dest.exists()
             && fs::canonicalize(source).ok() == fs::canonicalize(dest).ok())
     {
-        return Ok(());
+        return Ok(dest.to_path_buf());
     }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
@@ -224,8 +227,21 @@ fn install_binary(source: &Path, dest: &Path) -> Result<()> {
         let backup = dest.with_extension("old");
         let _ = fs::remove_file(&backup);
         if fs::rename(dest, &backup).is_err() {
-            fs::copy(source, dest)?;
-            return Ok(());
+            #[cfg(windows)]
+            {
+                let versioned = versioned_binary_path(dest, false);
+                if fs::copy(source, &versioned).is_ok() {
+                    return Ok(versioned);
+                }
+                let unique = versioned_binary_path(dest, true);
+                fs::copy(source, &unique)?;
+                return Ok(unique);
+            }
+            #[cfg(not(windows))]
+            {
+                fs::copy(source, dest)?;
+                return Ok(dest.to_path_buf());
+            }
         }
     }
     fs::copy(source, dest)?;
@@ -236,7 +252,21 @@ fn install_binary(source: &Path, dest: &Path) -> Result<()> {
         perms.set_mode(0o755);
         fs::set_permissions(dest, perms)?;
     }
-    Ok(())
+    Ok(dest.to_path_buf())
+}
+
+fn versioned_binary_path(dest: &Path, include_pid: bool) -> PathBuf {
+    let suffix = if include_pid {
+        format!("{}-{}", env!("CARGO_PKG_VERSION"), std::process::id())
+    } else {
+        env!("CARGO_PKG_VERSION").to_string()
+    };
+    let file_name = if cfg!(windows) {
+        format!("cbm-{suffix}.exe")
+    } else {
+        format!("cbm-{suffix}")
+    };
+    dest.with_file_name(file_name)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1145,9 +1175,22 @@ mod tests {
         let bin = dir.path().join("cbm.exe");
         fs::write(&bin, b"release-binary").unwrap();
 
-        install_binary(&bin, &bin).unwrap();
+        let installed = install_binary(&bin, &bin).unwrap();
 
+        assert_eq!(installed, bin);
         assert_eq!(fs::read(&bin).unwrap(), b"release-binary");
         assert!(!bin.with_extension("old").exists());
+    }
+
+    #[test]
+    fn versioned_binary_path_keeps_install_directory() {
+        let dest = PathBuf::from("C:/Users/test/.config/cbm-mcp/bin/cbm.exe");
+        let versioned = versioned_binary_path(&dest, false);
+        assert_eq!(versioned.parent(), dest.parent());
+        assert!(versioned
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .contains(env!("CARGO_PKG_VERSION")));
     }
 }

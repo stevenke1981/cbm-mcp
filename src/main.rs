@@ -39,6 +39,9 @@ enum Command {
         yes: bool,
         #[arg(long)]
         all: bool,
+        /// Print the install report as JSON on stdout
+        #[arg(long)]
+        json: bool,
     },
     /// Remove MCP integration and hooks
     Uninstall {
@@ -91,13 +94,17 @@ async fn main() {
             force,
             yes,
             all,
-        }) => cli::run_install(codebase_memory_mcp::install::InstallOptions {
-            dry_run,
-            force,
-            yes,
-            all_agents: all,
-            binary: None,
-        }),
+            json,
+        }) => cli::run_install(
+            codebase_memory_mcp::install::InstallOptions {
+                dry_run,
+                force,
+                yes,
+                all_agents: all,
+                binary: None,
+            },
+            json,
+        ),
         Some(Command::Uninstall {
             dry_run,
             yes,

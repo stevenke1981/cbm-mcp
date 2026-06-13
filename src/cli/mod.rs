@@ -158,13 +158,16 @@ fn format_cli_human(tool: &str, result: &Value) -> String {
     }
 }
 
-pub fn run_install(opts: InstallOptions) -> Result<()> {
+pub fn run_install(opts: InstallOptions, json: bool) -> Result<()> {
     let agent = AgentKind::detect();
     eprintln!("Detected agent: {} ({:?})", agent.slug(), agent);
     if opts.dry_run {
         eprintln!("(dry-run mode)");
     }
     let report = install::run_install(&opts)?;
+    if json {
+        println!("{}", serde_json::to_string(&report)?);
+    }
     eprintln!(
         "\nInstall directory: {}",
         install::default_install_dir().display()

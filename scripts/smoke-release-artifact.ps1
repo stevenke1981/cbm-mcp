@@ -94,6 +94,37 @@ function Invoke-McpSmoke([string]$Binary) {
     }
 }
 
+function Invoke-NativeCapture {
+    param(
+        [Parameter(Mandatory=$true)][string]$Binary,
+        [Parameter(Mandatory=$true)][string[]]$Arguments
+    )
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $Binary
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.Arguments = ($Arguments | ForEach-Object {
+        $argument = [string]$_
+        if ($argument -notmatch '[\s"]') {
+            $argument
+        } else {
+            $escaped = [regex]::Replace($argument, '(\\*)"', '$1$1\"')
+            $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+            '"' + $escaped + '"'
+        }
+    }) -join ' '
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    return [pscustomobject]@{
+        ExitCode = $proc.ExitCode
+        Stdout = $stdout
+        Stderr = $stderr
+    }
+}
+
 $SmokeCache = Join-Path $env:TEMP "cbm-mcp-smoke-cache"
 if (Test-Path $SmokeCache) { Remove-Item $SmokeCache -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $SmokeCache | Out-Null
@@ -105,15 +136,17 @@ Write-Host "==> smoke extracted binary" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "cbm --version failed" }
 
 $indexJson = '{"repo_path":".","project":"smoke-artifact","mode":"fast","persistence":false}'
-$indexOut = & $Extracted @('cli','index_repository','--json','--quiet',$indexJson) 2>$null
-if ($LASTEXITCODE -ne 0) { throw "index_repository from extracted binary failed" }
-if ($indexOut -notmatch '"success":true') { throw "index did not succeed" }
+$indexResult = Invoke-NativeCapture -Binary $Extracted -Arguments @('cli','index_repository','--json','--quiet',$indexJson)
+if ($indexResult.ExitCode -ne 0) { throw "index_repository from extracted binary failed: $($indexResult.Stderr)" }
+if ($indexResult.Stdout -notmatch '"success":true') { throw "index did not succeed: $($indexResult.Stdout)" }
 
 if (-not $SkipInstallDryRun) {
     Write-Host "==> smoke install dry-run" -ForegroundColor Cyan
-    $dryOut = & $Extracted @('install','--dry-run','--all') 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) { throw "install --dry-run failed: $dryOut" }
+    $dryResult = Invoke-NativeCapture -Binary $Extracted -Arguments @('install','--dry-run','--all','--json')
+    $dryOut = "$($dryResult.Stdout)`n$($dryResult.Stderr)"
+    if ($dryResult.ExitCode -ne 0) { throw "install --dry-run failed: $dryOut" }
     if ($dryOut -notmatch '\[dry-run\]') { throw "install dry-run produced no dry-run markers" }
+    $null = $dryResult.Stdout | ConvertFrom-Json
 }
 
 if (-not $SkipMcpSmoke) {

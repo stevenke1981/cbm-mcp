@@ -4,7 +4,7 @@ Status key: **Done** | **Partial** | **MVP** | **Not started** | **Omitted**
 
 Reference: `knowledge-graph/` (architecture, specifications, functions).
 
-Last updated: 2026-06-12 (Section 7 review applied).
+Last updated: 2026-06-13 (official rmcp and release-installer hardening applied).
 
 ## Status model
 
@@ -30,7 +30,8 @@ Last updated: 2026-06-12 (Section 7 review applied).
 | Project naming (`cbm+` prefix) | Yes | Yes (path hash slug; legacy `cbrlm+` accepted) | Done |
 | HTTP graph UI | Yes | Yes (search, node details, edge filters) | MVP |
 | Watcher / auto-reindex | Yes | Yes (backoff + dirty signature) | Done |
-| Graceful shutdown / cancel | Yes | Ctrl+C stops watcher/HTTP | MVP |
+| Graceful shutdown | Yes | EOF/service exit stops rmcp and watcher; Ctrl+C stops watcher/HTTP | MVP |
+| MCP request cancellation | Yes | Request and pipeline cooperative cancellation remain tracked in `RMCP_MIGRATION_TODO.md` | Not started |
 | FoundationDB backend | Yes | — | Omitted (SQLite only) |
 
 ## Indexing pipeline (heuristic passes marked)
@@ -92,6 +93,8 @@ All 11 reference signals contribute to `combined` score. Thresholds: `SIMILAR_TO
 | `cargo build --release` | Done |
 | `scripts/smoke-quality-gates.*` | Done (includes `query_graph` edge diversity) |
 | `scripts/smoke-release-artifact.ps1` | Done (Windows CI) |
+| OpenCode-compatible schema normalization | Done (`tools/list` and `get_tool`) |
+| Release installer API-rate-limit fallback | Done (Windows/Linux/macOS) |
 | README + parity matrix accurate | Done (no hard-coded test counts) |
 
 ## Section 6 (Review hardening)

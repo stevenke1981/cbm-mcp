@@ -39,20 +39,48 @@ if (-not (Test-Path $Bin)) {
     throw "release binary not found; run without -SkipBuild"
 }
 
+function Invoke-NativeCapture([string[]]$CliArgs) {
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $Bin
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.Arguments = ($CliArgs | ForEach-Object {
+        $argument = [string]$_
+        if ($argument -notmatch '[\s"]') {
+            $argument
+        } else {
+            $escaped = [regex]::Replace($argument, '(\\*)"', '$1$1\"')
+            $escaped = [regex]::Replace($escaped, '(\\+)$', '$1$1')
+            '"' + $escaped + '"'
+        }
+    }) -join ' '
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $proc.StandardOutput.ReadToEnd()
+    $stderr = $proc.StandardError.ReadToEnd()
+    $proc.WaitForExit()
+    return [pscustomobject]@{
+        ExitCode = $proc.ExitCode
+        Stdout = $stdout
+        Stderr = $stderr
+    }
+}
+
 function Invoke-CbrlmCli([string[]]$CliArgs) {
-    $out = & $Bin @CliArgs 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
+    $result = Invoke-NativeCapture $CliArgs
+    $out = "$($result.Stdout)`n$($result.Stderr)"
+    if ($result.ExitCode -ne 0) {
         throw "codebase-memory-mcp cli failed: $($CliArgs -join ' ')`n$out"
     }
     return $out
 }
 
 function Invoke-CbrlmCliStdout([string[]]$CliArgs) {
-    $out = & $Bin @CliArgs 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        throw "codebase-memory-mcp cli failed: $($CliArgs -join ' ')"
+    $result = Invoke-NativeCapture $CliArgs
+    if ($result.ExitCode -ne 0) {
+        throw "codebase-memory-mcp cli failed: $($CliArgs -join ' ')`n$($result.Stderr)"
     }
-    return ($out | Out-String).Trim()
+    return $result.Stdout.Trim()
 }
 
 Write-Host "==> smoke: index_repository" -ForegroundColor Cyan

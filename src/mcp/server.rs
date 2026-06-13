@@ -6,7 +6,11 @@ use crate::mcp::params::{
 use crate::mcp::tools::ToolHandler;
 use crate::watcher::Watcher;
 use rmcp::handler::server::{router::tool::ToolRouter, wrapper::Parameters};
-use rmcp::model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo};
+use rmcp::model::{
+    CallToolResult, Content, Implementation, ListToolsResult, PaginatedRequestParams,
+    ServerCapabilities, ServerInfo, Tool,
+};
+use rmcp::service::{RequestContext, RoleServer};
 use rmcp::{tool, tool_handler, tool_router, ServerHandler, ServiceExt};
 use serde::Serialize;
 use serde_json::Value;
@@ -43,8 +47,7 @@ impl McpServer {
     }
 
     pub fn generated_tool_definitions() -> Vec<Value> {
-        Self::tool_router()
-            .list_all()
+        normalize_tool_schemas(Self::tool_router().list_all())
             .into_iter()
             .map(|tool| serde_json::to_value(tool).expect("rmcp tool must serialize"))
             .collect()
@@ -227,6 +230,25 @@ impl McpServer {
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for McpServer {
+    async fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> std::result::Result<ListToolsResult, rmcp::ErrorData> {
+        Ok(ListToolsResult {
+            tools: normalize_tool_schemas(self.tool_router.list_all()),
+            meta: None,
+            next_cursor: None,
+        })
+    }
+
+    fn get_tool(&self, name: &str) -> Option<Tool> {
+        self.tool_router
+            .get(name)
+            .cloned()
+            .map(normalize_tool_schema)
+    }
+
     fn get_info(&self) -> ServerInfo {
         let watcher_on = self.watcher.is_some();
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
@@ -234,6 +256,56 @@ impl ServerHandler for McpServer {
             .with_instructions(format!(
                 "CBM graph server. Index with index_repository, then use search_graph, trace_path, or query_graph. Git watcher: {watcher_on}. RLM tools are provided by the independent rlm-mcp server."
             ))
+    }
+}
+
+fn normalize_tool_schemas(tools: Vec<Tool>) -> Vec<Tool> {
+    tools.into_iter().map(normalize_tool_schema).collect()
+}
+
+fn normalize_tool_schema(mut tool: Tool) -> Tool {
+    let mut schema = Value::Object(tool.input_schema.as_ref().clone());
+    normalize_json_schema_node(&mut schema);
+    if let Value::Object(object) = schema {
+        tool.input_schema = Arc::new(object);
+    }
+    tool
+}
+
+fn normalize_json_schema_node(value: &mut Value) {
+    match value {
+        Value::Bool(_) => *value = Value::Object(Default::default()),
+        Value::Object(object) => {
+            for key in ["properties", "patternProperties", "$defs", "definitions"] {
+                if let Some(Value::Object(children)) = object.get_mut(key) {
+                    for child in children.values_mut() {
+                        normalize_json_schema_node(child);
+                    }
+                }
+            }
+            for key in [
+                "items",
+                "additionalProperties",
+                "contains",
+                "not",
+                "if",
+                "then",
+                "else",
+                "propertyNames",
+            ] {
+                if let Some(child) = object.get_mut(key) {
+                    normalize_json_schema_node(child);
+                }
+            }
+            for key in ["allOf", "anyOf", "oneOf", "prefixItems"] {
+                if let Some(Value::Array(items)) = object.get_mut(key) {
+                    for item in items {
+                        normalize_json_schema_node(item);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 
