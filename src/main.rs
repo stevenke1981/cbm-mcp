@@ -64,7 +64,8 @@ enum Command {
     },
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
 
     let cli_quiet = matches!(&args.command, Some(Command::Cli { quiet: true, .. }));
@@ -117,9 +118,12 @@ fn main() {
         }
         Some(Command::Config { action }) => cli::run_config(&action),
         Some(Command::Ui { port }) => cli::run_ui_server(port),
-        None => cli::run_mcp_server(codebase_memory_mcp::http::UiConfig::from_env_and_args(
-            args.ui, args.port,
-        )),
+        None => {
+            cli::run_mcp_server(codebase_memory_mcp::http::UiConfig::from_env_and_args(
+                args.ui, args.port,
+            ))
+            .await
+        }
     };
 
     if let Err(e) = result {

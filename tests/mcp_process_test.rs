@@ -95,7 +95,7 @@ fn mcp_process_initialize_tools_list_snapshot_and_call() {
     let result = init_resp.get("result").expect("initialize result");
     assert_eq!(
         result.pointer("/serverInfo/name").and_then(|v| v.as_str()),
-        Some("cbm")
+        Some("codebase-memory-mcp")
     );
 
     let list = serde_json::json!({

@@ -1,5 +1,7 @@
 # TODO - cbm-mcp full clone of codebase-memory-mcp
 
+Official Rust MCP SDK migration plan: [`RMCP_MIGRATION_TODO.md`](RMCP_MIGRATION_TODO.md).
+
 Goal: make `D:\cbm-mcp` a complete, independent Rust clone of the reference `codebase-memory-mcp`.
 
 ## Status snapshot (2026-06-12)

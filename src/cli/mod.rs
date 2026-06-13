@@ -236,7 +236,7 @@ pub fn run_ui_server(port: u16) -> Result<()> {
     Ok(())
 }
 
-pub fn run_mcp_server(ui_config: UiConfig) -> Result<()> {
+pub async fn run_mcp_server(ui_config: UiConfig) -> Result<()> {
     let shutdown = crate::runtime::Shutdown::new();
     shutdown.install_ctrlc_handler();
 
@@ -248,7 +248,7 @@ pub fn run_mcp_server(ui_config: UiConfig) -> Result<()> {
     let mcp = McpServer::new();
     mcp.start_background_services(Some(shutdown.clone()));
 
-    let result = mcp.run_until_shutdown(Some(shutdown.clone()));
+    let result = mcp.serve_stdio().await;
 
     if let Some(ref mut server) = http {
         server.stop();

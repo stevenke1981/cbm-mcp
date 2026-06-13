@@ -1,6 +1,6 @@
 //! Compare runtime MCP tool definitions against checked-in specs under `mcps/`.
 
-use codebase_memory_mcp::mcp::tool_definitions;
+use codebase_memory_mcp::mcp::McpServer;
 use serde_json::Value;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
@@ -97,7 +97,7 @@ fn compare_tool(runtime: &Value, spec: &Value, name: &str) -> Vec<String> {
 
 #[test]
 fn runtime_tools_match_checked_in_specs() {
-    let runtime: Vec<Value> = tool_definitions();
+    let runtime: Vec<Value> = McpServer::generated_tool_definitions();
     let specs = load_checked_in_specs();
 
     let runtime_names: BTreeSet<_> = runtime

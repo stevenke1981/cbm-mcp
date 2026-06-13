@@ -1,13 +1,12 @@
 use crate::agent::AgentKind;
 use crate::error::{Error, Result};
 use crate::hooks::{CODEX_HOOK_BEGIN, CODEX_HOOK_END, CODEX_SESSION_REMINDER_CMD};
-use crate::mcp::SERVER_NAME;
 use serde_json::{json, Map, Value};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-pub const MCP_SERVER_NAME: &str = SERVER_NAME;
+pub const MCP_SERVER_NAME: &str = "cbm";
 pub const INSTALL_DIR_NAME: &str = "cbm-mcp";
 const LEGACY_MCP_SERVER_NAMES: &[&str] = &["codebase-memory-mcp", "cbrlm-mcp", "cbm"];
 

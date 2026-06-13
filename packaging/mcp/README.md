@@ -2,9 +2,13 @@
 
 Handoff templates for agents wiring **cbm** (graph index only).
 
-Server name: `cbm`
+Agent config key: `cbm`
+MCP `serverInfo.name`: `codebase-memory-mcp`
 Transport: stdio
 Binary: `cbm` / `cbm.exe` or absolute path to the release binary
+
+Protocol handling, capability negotiation, tool routing, and stdio framing are
+provided by the official Rust MCP SDK (`rmcp 1.7.0`).
 
 ## Fast path
 

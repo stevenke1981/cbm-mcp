@@ -1,31 +1,40 @@
-use crate::error::{Result, JSONRPC_INTERNAL_ERROR, JSONRPC_METHOD_NOT_FOUND, JSONRPC_PARSE_ERROR};
-use crate::mcp::tool_specs::tool_definitions;
+use crate::error::{Error, Result as CbmResult};
+use crate::mcp::params::{
+    IndexRepositoryArgs, IngestTracesArgs, ManageAdrArgs, ProjectArgs, QueryGraphArgs,
+    SearchCodeArgs, SearchGraphArgs, SnippetArgs, TraceArgs,
+};
 use crate::mcp::tools::ToolHandler;
-use crate::mcp::transport::{read_stdin_message, write_stdout_message};
 use crate::watcher::Watcher;
-use serde_json::{json, Value};
+use rmcp::handler::server::{router::tool::ToolRouter, wrapper::Parameters};
+use rmcp::model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo};
+use rmcp::{tool, tool_handler, tool_router, ServerHandler, ServiceExt};
+use serde::Serialize;
+use serde_json::Value;
 use std::sync::Arc;
 
-pub const SERVER_NAME: &str = "cbm";
+pub const SERVER_NAME: &str = "codebase-memory-mcp";
 pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Clone)]
 pub struct McpServer {
     handler: ToolHandler,
     watcher: Option<Arc<Watcher>>,
+    tool_router: ToolRouter<Self>,
 }
 
 impl McpServer {
     pub fn new() -> Self {
         let watcher = if watcher_enabled() {
-            let w = Arc::new(Watcher::new());
-            w.refresh_from_disk();
-            Some(w)
+            let watcher = Arc::new(Watcher::new());
+            watcher.refresh_from_disk();
+            Some(watcher)
         } else {
             None
         };
         Self {
             handler: ToolHandler::new(watcher.clone()),
             watcher,
+            tool_router: Self::tool_router(),
         }
     }
 
@@ -33,315 +42,214 @@ impl McpServer {
         self.watcher.clone()
     }
 
+    pub fn generated_tool_definitions() -> Vec<Value> {
+        Self::tool_router()
+            .list_all()
+            .into_iter()
+            .map(|tool| serde_json::to_value(tool).expect("rmcp tool must serialize"))
+            .collect()
+    }
+
     pub fn start_background_services(&self, shutdown: Option<Arc<crate::runtime::Shutdown>>) {
-        if let Some(w) = &self.watcher {
-            let w = w.clone();
-            w.spawn(shutdown);
+        if let Some(watcher) = &self.watcher {
+            watcher.clone().spawn(shutdown);
         }
     }
 
     pub fn stop_services(&self) {
-        if let Some(w) = &self.watcher {
-            w.stop();
+        if let Some(watcher) = &self.watcher {
+            watcher.stop();
         }
     }
 
-    pub fn run(&self) -> Result<()> {
-        self.run_until_shutdown(None)
+    pub async fn serve_stdio(self) -> CbmResult<()> {
+        let service = self
+            .clone()
+            .serve(rmcp::transport::stdio())
+            .await
+            .map_err(|error| Error::Other(format!("failed to start MCP stdio service: {error}")))?;
+        let result = service.waiting().await;
+        self.stop_services();
+        result
+            .map(|_| ())
+            .map_err(|error| Error::Other(format!("MCP stdio service failed: {error}")))
     }
 
-    pub fn run_until_shutdown(
+    async fn invoke<P>(&self, name: &'static str, params: P) -> CallToolResult
+    where
+        P: Serialize + Send + 'static,
+    {
+        let handler = self.handler.clone();
+        let args = match serde_json::to_value(params) {
+            Ok(args) => args,
+            Err(error) => return tool_error(format!("invalid tool arguments: {error}")),
+        };
+
+        match tokio::task::spawn_blocking(move || handler.handle(name, &args)).await {
+            Ok(Ok(value)) => match serde_json::to_string_pretty(&value) {
+                Ok(text) => CallToolResult::success(vec![Content::text(text)]),
+                Err(error) => tool_error(format!("failed to encode tool result: {error}")),
+            },
+            Ok(Err(error)) => tool_error(error.to_string()),
+            Err(error) => {
+                tracing::error!(tool = name, %error, "CBM tool worker failed");
+                tool_error("internal tool worker failure")
+            }
+        }
+    }
+
+    async fn invoke_empty(&self, name: &'static str) -> CallToolResult {
+        self.invoke(name, serde_json::json!({})).await
+    }
+}
+
+pub fn tool_definitions() -> Vec<Value> {
+    McpServer::generated_tool_definitions()
+}
+
+#[tool_router(router = tool_router)]
+impl McpServer {
+    #[tool(
+        name = "index_repository",
+        description = "Index a repository into the knowledge graph."
+    )]
+    async fn index_repository(
         &self,
-        shutdown: Option<Arc<crate::runtime::Shutdown>>,
-    ) -> Result<()> {
-        loop {
-            if shutdown.as_ref().is_some_and(|s| s.is_triggered()) {
-                self.stop_services();
-                break;
-            }
-            let Some(line) = read_stdin_message()? else {
-                self.stop_services();
-                break;
-            };
-            let response = self.handle_message(&line)?;
-            if let Some(body) = response {
-                write_stdout_message(&body)?;
-            }
-        }
-        Ok(())
+        Parameters(params): Parameters<IndexRepositoryArgs>,
+    ) -> CallToolResult {
+        self.invoke("index_repository", params).await
     }
 
-    pub fn handle_message(&self, raw: &str) -> Result<Option<String>> {
-        let request: Value = match serde_json::from_str(raw) {
-            Ok(v) => v,
-            Err(_) => {
-                return Ok(Some(format_error(
-                    Value::Null,
-                    JSONRPC_PARSE_ERROR,
-                    "Parse error",
-                )?));
-            }
-        };
-
-        let id = request.get("id").cloned();
-        let Some(method) = request.get("method").and_then(|m| m.as_str()) else {
-            return Ok(Some(format_error(
-                jsonrpc_error_id(id),
-                JSONRPC_PARSE_ERROR,
-                "Parse error",
-            )?));
-        };
-
-        let result = match method {
-            "initialize" => Ok(self.handle_initialize(&request)),
-            "notifications/initialized" | "initialized" => return Ok(None),
-            "ping" => Ok(json!({})),
-            "tools/list" => Ok(json!({ "tools": tool_definitions() })),
-            "tools/call" => self.handle_tool_call(&request),
-            _ => {
-                if id.is_none() {
-                    return Ok(None);
-                }
-                return Ok(Some(format_error(
-                    id.unwrap(),
-                    JSONRPC_METHOD_NOT_FOUND,
-                    "Method not found",
-                )?));
-            }
-        };
-
-        match (id, result) {
-            (None, _) => Ok(None),
-            (Some(id), Ok(value)) => Ok(Some(format_response(id, value)?)),
-            (Some(id), Err(e)) => Ok(Some(format_error(
-                id,
-                JSONRPC_INTERNAL_ERROR,
-                &e.to_string(),
-            )?)),
-        }
+    #[tool(
+        name = "index_status",
+        description = "Check index status for a project."
+    )]
+    async fn index_status(&self, Parameters(params): Parameters<ProjectArgs>) -> CallToolResult {
+        self.invoke("index_status", params).await
     }
 
-    fn handle_initialize(&self, request: &Value) -> Value {
-        let _params = request.get("params");
+    #[tool(
+        name = "search_graph",
+        description = "Search the code knowledge graph."
+    )]
+    async fn search_graph(
+        &self,
+        Parameters(params): Parameters<SearchGraphArgs>,
+    ) -> CallToolResult {
+        self.invoke("search_graph", params).await
+    }
+
+    #[tool(name = "trace_path", description = "Trace call paths.")]
+    async fn trace_path(&self, Parameters(params): Parameters<TraceArgs>) -> CallToolResult {
+        self.invoke("trace_path", params).await
+    }
+
+    #[tool(
+        name = "get_code_snippet",
+        description = "Read source code for a symbol."
+    )]
+    async fn get_code_snippet(
+        &self,
+        Parameters(params): Parameters<SnippetArgs>,
+    ) -> CallToolResult {
+        self.invoke("get_code_snippet", params).await
+    }
+
+    #[tool(
+        name = "get_graph_schema",
+        description = "Get the schema of the knowledge graph."
+    )]
+    async fn get_graph_schema(
+        &self,
+        Parameters(params): Parameters<ProjectArgs>,
+    ) -> CallToolResult {
+        self.invoke("get_graph_schema", params).await
+    }
+
+    #[tool(name = "get_architecture", description = "Architecture overview.")]
+    async fn get_architecture(
+        &self,
+        Parameters(params): Parameters<ProjectArgs>,
+    ) -> CallToolResult {
+        self.invoke("get_architecture", params).await
+    }
+
+    #[tool(
+        name = "query_graph",
+        description = "Execute a read-only graph query (SELECT on symbols/edges/files)."
+    )]
+    async fn query_graph(&self, Parameters(params): Parameters<QueryGraphArgs>) -> CallToolResult {
+        self.invoke("query_graph", params).await
+    }
+
+    #[tool(
+        name = "search_code",
+        description = "Graph-augmented code search. Modes: compact, files."
+    )]
+    async fn search_code(&self, Parameters(params): Parameters<SearchCodeArgs>) -> CallToolResult {
+        self.invoke("search_code", params).await
+    }
+
+    #[tool(name = "list_projects", description = "List indexed projects.")]
+    async fn list_projects(&self) -> CallToolResult {
+        self.invoke_empty("list_projects").await
+    }
+
+    #[tool(name = "delete_project", description = "Delete a project index.")]
+    async fn delete_project(&self, Parameters(params): Parameters<ProjectArgs>) -> CallToolResult {
+        self.invoke("delete_project", params).await
+    }
+
+    #[tool(name = "detect_changes", description = "Detect git-changed files.")]
+    async fn detect_changes(&self, Parameters(params): Parameters<ProjectArgs>) -> CallToolResult {
+        self.invoke("detect_changes", params).await
+    }
+
+    #[tool(
+        name = "manage_adr",
+        description = "Create or update Architecture Decision Records."
+    )]
+    async fn manage_adr(&self, Parameters(params): Parameters<ManageAdrArgs>) -> CallToolResult {
+        self.invoke("manage_adr", params).await
+    }
+
+    #[tool(
+        name = "ingest_traces",
+        description = "Ingest runtime traces to enhance the knowledge graph."
+    )]
+    async fn ingest_traces(
+        &self,
+        Parameters(params): Parameters<IngestTracesArgs>,
+    ) -> CallToolResult {
+        self.invoke("ingest_traces", params).await
+    }
+}
+
+#[tool_handler(router = self.tool_router)]
+impl ServerHandler for McpServer {
+    fn get_info(&self) -> ServerInfo {
         let watcher_on = self.watcher.is_some();
-        json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {
-                "tools": { "listChanged": false }
-            },
-            "serverInfo": {
-                "name": SERVER_NAME,
-                "version": SERVER_VERSION
-            },
-            "instructions": format!(
-                "cbm graph server. Index with index_repository, then search_graph / trace_path / query_graph. Git watcher: {watcher_on}. RLM tools live in rlm-mcp (separate server)."
-            )
-        })
-    }
-
-    fn handle_tool_call(&self, request: &Value) -> Result<Value> {
-        let params = request.get("params");
-        let name = params.and_then(|p| p.get("name")).and_then(|v| v.as_str());
-        let Some(name) = name else {
-            return Ok(tool_text_result("missing tool name", true));
-        };
-        let args = params
-            .and_then(|p| p.get("arguments"))
-            .cloned()
-            .unwrap_or(json!({}));
-        match self.handler.handle(name, &args) {
-            Ok(result) => Ok(json!({
-                "content": [{
-                    "type": "text",
-                    "text": serde_json::to_string_pretty(&result)?
-                }],
-                "isError": false
-            })),
-            Err(e) => Ok(tool_text_result(&e.to_string(), true)),
-        }
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new(SERVER_NAME, SERVER_VERSION))
+            .with_instructions(format!(
+                "CBM graph server. Index with index_repository, then use search_graph, trace_path, or query_graph. Git watcher: {watcher_on}. RLM tools are provided by the independent rlm-mcp server."
+            ))
     }
 }
 
-fn jsonrpc_error_id(id: Option<Value>) -> Value {
-    id.unwrap_or(Value::from(0))
-}
-
-fn tool_text_result(text: &str, is_error: bool) -> Value {
-    let mut result = json!({
-        "content": [{
-            "type": "text",
-            "text": text
-        }]
-    });
-    if is_error {
-        result["isError"] = json!(true);
-    }
-    result
+fn tool_error(message: impl Into<String>) -> CallToolResult {
+    CallToolResult::error(vec![Content::text(message.into())])
 }
 
 fn watcher_enabled() -> bool {
-    let v = std::env::var("CBM_WATCHER")
+    let value = std::env::var("CBM_WATCHER")
         .or_else(|_| std::env::var("CBRLM_WATCHER"))
         .unwrap_or_default();
-    !matches!(v.as_str(), "0" | "false" | "off")
-}
-
-fn format_response(id: Value, result: Value) -> Result<String> {
-    Ok(serde_json::to_string(&json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": result
-    }))?)
-}
-
-fn format_error(id: Value, code: i32, message: &str) -> Result<String> {
-    Ok(serde_json::to_string(&json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": { "code": code, "message": message }
-    }))?)
+    !matches!(value.as_str(), "0" | "false" | "off")
 }
 
 impl Default for McpServer {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn handles_initialize() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {}
-        });
-        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        assert!(resp.contains("\"name\":\"cbm\""));
-    }
-
-    #[test]
-    fn lists_graph_tools_only() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/list",
-            "params": {}
-        });
-        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        assert!(resp.contains("index_repository"));
-        assert!(!resp.contains("rlm_workflow"));
-    }
-
-    #[test]
-    fn parse_error_on_invalid_json() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let resp = server
-            .handle_message("not json")
-            .unwrap()
-            .expect("parse error response");
-        let value: Value = serde_json::from_str(&resp).unwrap();
-        assert_eq!(value.get("id"), Some(&Value::Null));
-        assert_eq!(
-            value.pointer("/error/code").and_then(|v| v.as_i64()),
-            Some(-32700)
-        );
-    }
-
-    #[test]
-    fn method_not_found_returns_32601() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "unknown/method"
-        });
-        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        let value: Value = serde_json::from_str(&resp).unwrap();
-        assert_eq!(value.get("id"), Some(&Value::from(3)));
-        assert_eq!(
-            value.pointer("/error/code").and_then(|v| v.as_i64()),
-            Some(-32601)
-        );
-        assert_eq!(
-            value.pointer("/error/message").and_then(|v| v.as_str()),
-            Some("Method not found")
-        );
-    }
-
-    #[test]
-    fn tools_call_unknown_tool_returns_is_error() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": 12,
-            "method": "tools/call",
-            "params": {
-                "name": "nonexistent_tool",
-                "arguments": {}
-            }
-        });
-        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        let value: Value = serde_json::from_str(&resp).unwrap();
-        assert_eq!(value.get("id"), Some(&Value::from(12)));
-        assert_eq!(
-            value.pointer("/result/isError").and_then(|v| v.as_bool()),
-            Some(true)
-        );
-        assert!(value
-            .pointer("/result/content/0/text")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .contains("unknown tool"));
-    }
-
-    #[test]
-    fn tools_call_missing_name_returns_is_error() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": 50,
-            "method": "tools/call",
-            "params": { "arguments": {} }
-        });
-        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        let value: Value = serde_json::from_str(&resp).unwrap();
-        assert_eq!(
-            value.pointer("/result/isError").and_then(|v| v.as_bool()),
-            Some(true)
-        );
-        assert_eq!(
-            value
-                .pointer("/result/content/0/text")
-                .and_then(|v| v.as_str()),
-            Some("missing tool name")
-        );
-    }
-
-    #[test]
-    fn string_id_preserved_in_response() {
-        std::env::set_var("CBM_WATCHER", "0");
-        let server = McpServer::new();
-        let req = json!({
-            "jsonrpc": "2.0",
-            "id": "init-abc",
-            "method": "initialize",
-            "params": {}
-        });
-        let resp = server.handle_message(&req.to_string()).unwrap().unwrap();
-        let value: Value = serde_json::from_str(&resp).unwrap();
-        assert_eq!(value.get("id"), Some(&Value::from("init-abc")));
     }
 }

@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct ToolHandler {
     watcher: Option<Arc<Watcher>>,
 }

@@ -1,7 +1,7 @@
 mod support;
 
 use codebase_memory_mcp::discover::IndexMode;
-use codebase_memory_mcp::mcp::McpServer;
+use codebase_memory_mcp::mcp::ToolHandler;
 use codebase_memory_mcp::pipeline::Pipeline;
 use codebase_memory_mcp::project::normalize_project_name;
 use codebase_memory_mcp::store::{SearchFilter, Store};
@@ -132,58 +132,26 @@ fn mcp_tools_call_index_and_search() {
     let (_guard, _cache, _) = isolated_cache();
     std::env::set_var("CBRLM_WATCHER", "0");
     let dir = fixture_repo();
-    let server = McpServer::new();
+    let handler = ToolHandler::new(None);
 
-    let index_req = json!({
-        "jsonrpc": "2.0",
-        "id": 10,
-        "method": "tools/call",
-        "params": {
-            "name": "index_repository",
-            "arguments": {
-                "repo_path": dir.path().to_string_lossy(),
-                "project": "mcp-test"
-            }
-        }
+    let index_args = json!({
+        "repo_path": dir.path().to_string_lossy(),
+        "project": "mcp-test"
     });
-    let resp = server
-        .handle_message(&index_req.to_string())
-        .unwrap()
-        .unwrap();
-    assert!(resp.contains("success"));
+    let resp = handler.handle("index_repository", &index_args).unwrap();
+    assert_eq!(resp.get("success").and_then(|v| v.as_bool()), Some(true));
 
-    let search_req = json!({
-        "jsonrpc": "2.0",
-        "id": 11,
-        "method": "tools/call",
-        "params": {
-            "name": "search_graph",
-            "arguments": {
-                "project": "mcp-test",
-                "query": "format"
-            }
-        }
+    let search_args = json!({
+        "project": "mcp-test",
+        "query": "format"
     });
-    let resp = server
-        .handle_message(&search_req.to_string())
-        .unwrap()
-        .unwrap();
-    assert!(resp.contains("symbols"));
+    let resp = handler.handle("search_graph", &search_args).unwrap();
+    assert!(resp.get("symbols").is_some());
 
-    let schema_req = json!({
-        "jsonrpc": "2.0",
-        "id": 12,
-        "method": "tools/call",
-        "params": {
-            "name": "get_graph_schema",
-            "arguments": { "project": "mcp-test" }
-        }
-    });
-    let resp = server
-        .handle_message(&schema_req.to_string())
-        .unwrap()
+    let resp = handler
+        .handle("get_graph_schema", &json!({ "project": "mcp-test" }))
         .unwrap();
-    assert!(resp.contains("implemented_edge_types"));
+    assert!(resp.get("implemented_edge_types").is_some());
 
     let _ = codebase_memory_mcp::store::delete_project_db(&normalize_project_name("mcp-test"));
 }
@@ -193,83 +161,49 @@ fn manage_adr_sections_update_and_get() {
     let (_guard, _cache, _) = isolated_cache();
     std::env::set_var("CBRLM_WATCHER", "0");
     let dir = fixture_repo();
-    let server = McpServer::new();
+    let handler = ToolHandler::new(None);
     let project = "adr-test";
 
-    let index_req = json!({
-        "jsonrpc": "2.0",
-        "id": 20,
-        "method": "tools/call",
-        "params": {
-            "name": "index_repository",
-            "arguments": {
-                "repo_path": dir.path().to_string_lossy(),
-                "project": project,
-                "mode": "fast",
-                "persistence": false
-            }
-        }
+    let index_args = json!({
+        "repo_path": dir.path().to_string_lossy(),
+        "project": project,
+        "mode": "fast",
+        "persistence": false
     });
-    server
-        .handle_message(&index_req.to_string())
-        .unwrap()
-        .unwrap();
+    handler.handle("index_repository", &index_args).unwrap();
 
-    let update_req = json!({
-        "jsonrpc": "2.0",
-        "id": 21,
-        "method": "tools/call",
-        "params": {
-            "name": "manage_adr",
-            "arguments": {
-                "project": project,
-                "mode": "update",
-                "content": "## PURPOSE\nTest ADR\n\n## STACK\nRust\n"
-            }
-        }
+    let update_args = json!({
+        "project": project,
+        "mode": "update",
+        "content": "## PURPOSE\nTest ADR\n\n## STACK\nRust\n"
     });
-    let update_resp = server
-        .handle_message(&update_req.to_string())
-        .unwrap()
-        .unwrap();
-    assert!(update_resp.contains("updated"));
+    let update_resp = handler.handle("manage_adr", &update_args).unwrap();
+    assert_eq!(
+        update_resp.get("status").and_then(|v| v.as_str()),
+        Some("updated")
+    );
 
-    let sections_req = json!({
-        "jsonrpc": "2.0",
-        "id": 22,
-        "method": "tools/call",
-        "params": {
-            "name": "manage_adr",
-            "arguments": {
-                "project": project,
-                "mode": "sections"
-            }
-        }
+    let sections_args = json!({
+        "project": project,
+        "mode": "sections"
     });
-    let sections_resp = server
-        .handle_message(&sections_req.to_string())
-        .unwrap()
-        .unwrap();
-    assert!(sections_resp.contains("## PURPOSE"));
-    assert!(sections_resp.contains("## STACK"));
+    let sections_resp = handler.handle("manage_adr", &sections_args).unwrap();
+    let sections = sections_resp
+        .get("sections")
+        .and_then(|v| v.as_array())
+        .expect("sections array");
+    assert!(sections.iter().any(|v| v.as_str() == Some("## PURPOSE")));
+    assert!(sections.iter().any(|v| v.as_str() == Some("## STACK")));
 
-    let get_req = json!({
-        "jsonrpc": "2.0",
-        "id": 23,
-        "method": "tools/call",
-        "params": {
-            "name": "manage_adr",
-            "arguments": {
-                "project": project,
-                "mode": "get"
-            }
-        }
+    let get_args = json!({
+        "project": project,
+        "mode": "get"
     });
-    let get_resp = server
-        .handle_message(&get_req.to_string())
-        .unwrap()
-        .unwrap();
-    assert!(get_resp.contains("Test ADR"));
+    let get_resp = handler.handle("manage_adr", &get_args).unwrap();
+    assert!(get_resp
+        .get("content")
+        .and_then(|v| v.as_str())
+        .is_some_and(|content| content.contains("Test ADR")));
 
     let _ = codebase_memory_mcp::store::delete_project_db(&normalize_project_name(project));
 }

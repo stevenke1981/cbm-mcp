@@ -8,7 +8,7 @@ Independent Rust implementation of **[codebase-memory-mcp](https://github.com/De
 
 | Path | MCP server | Role |
 |------|------------|------|
-| `D:\cbm-mcp` | `cbm` | **This repo** — graph indexing, 14 MCP tools |
+| `D:\cbm-mcp` | config key `cbm` (`serverInfo.name`: `codebase-memory-mcp`) | **This repo** — graph indexing, 14 MCP tools |
 | `D:\rlm-mcp` | `rlm-mcp` | Standalone RLM sessions (scan/peek/chunk) |
 | `D:\cbm\cbrlm` | `cbrlm-mcp` (legacy) | Deprecated combined binary |
 
@@ -96,8 +96,13 @@ cbm cli search_graph --json '{"project":"my-app","query":"handler","limit":10}'
 
 ```powershell
 cbm
-# MCP server name: cbm
+# Agent config key: cbm
+# MCP serverInfo.name: codebase-memory-mcp
 ```
+
+The MCP boundary uses the official Rust SDK, `rmcp 1.7.0`, with typed
+Schemars-generated tool inputs and stdio transport. Stdout is protocol-only;
+diagnostics are written to stderr.
 
 ### Optional: with rlm-mcp
 
