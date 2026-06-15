@@ -103,16 +103,16 @@ if [ "$FROM_SOURCE" = true ]; then
     die "--from-source requires a local clone (run from repo root)."
   fi
   ARGS=()
-  [ "$ALL_AGENTS" = true ] && ARGS+=(--all-agents)
-  [ "${SKIP_BUILD:-false}" = true ] && ARGS+=(--skip-build)
+  if [ "$ALL_AGENTS" = true ]; then ARGS+=(--all-agents); fi
+  if [ "${SKIP_BUILD:-false}" = true ]; then ARGS+=(--skip-build); fi
   exec "$SCRIPT_DIR/scripts/install.sh" "${ARGS[@]}"
 fi
 
 # ── Build args for packaging script ──────────────────────────────────────────
 SCRIPT_ARGS=()
-[ "$UNINSTALL" = true ] && SCRIPT_ARGS+=(--uninstall)
-[ -n "$VERSION" ] && SCRIPT_ARGS+=(--version "$VERSION")
-[ -n "$INSTALL_DIR" ] && SCRIPT_ARGS+=(--prefix "$INSTALL_DIR")
+if [ "$UNINSTALL" = true ]; then SCRIPT_ARGS+=(--uninstall); fi
+if [ -n "$VERSION" ]; then SCRIPT_ARGS+=(--version "$VERSION"); fi
+if [ -n "$INSTALL_DIR" ]; then SCRIPT_ARGS+=(--prefix "$INSTALL_DIR"); fi
 
 # ── Run packaging script ─────────────────────────────────────────────────────
 run_packaging_script() {

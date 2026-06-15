@@ -117,7 +117,9 @@ check_deps() {
     error "Required command not found: sha256sum or shasum"
     missing=true
   fi
-  [ "$missing" = true ] && die "Install missing dependencies and re-run."
+  if [ "$missing" = true ]; then
+    die "Install missing dependencies and re-run."
+  fi
 }
 check_deps
 
@@ -129,7 +131,7 @@ detect_distro() {
   elif command -v lsb_release &>/dev/null; then
     id=$(lsb_release -si 2>/dev/null | tr '[:upper:]' '[:lower:]')
   fi
-  echo "$id"
+  printf '%s' "$id"
 }
 DISTRO=$(detect_distro)
 
@@ -243,7 +245,9 @@ info "Configuring MCP agents..."
 "$CONFIG_DIR/cbm" install --yes --all
 
 DISTRO_MSG=""
-[ -n "$DISTRO" ] && DISTRO_MSG=" on ${DISTRO}"
+if [ -n "$DISTRO" ]; then
+  DISTRO_MSG=" on ${DISTRO}"
+fi
 
 echo ""
 info "${BOLD}Installed cbm ${VERSION}${NC}${DISTRO_MSG}"
