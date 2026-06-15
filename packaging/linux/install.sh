@@ -144,28 +144,43 @@ case "$arch" in
 esac
 
 # ── Resolve version ───────────────────────────────────────────────────────────
-if [ "$VERSION" = "latest" ]; then
-  detail "Resolving latest release from GitHub API..."
-  API="https://api.github.com/repos/${REPO}/releases/latest"
-  token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+resolve_version() {
+  local api_url="https://api.github.com/repos/${1}/releases/latest"
+  local token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  local tag=""
+
   if [ -n "$token" ]; then
-    VERSION=$(curl -fsSL -H "User-Agent: cbm-mcp-installer" \
-      -H "Authorization: Bearer ${token}" "$API" \
-      | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/' || true)
+    tag=$(curl -fsSL -H "User-Agent: cbm-mcp-installer" \
+      -H "Authorization: Bearer ${token}" "$api_url" 2>/dev/null \
+      | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+      | head -1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
   else
-    VERSION=$(curl -fsSL -H "User-Agent: cbm-mcp-installer" "$API" \
-      | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": "([^"]+)".*/\1/' || true)
+    tag=$(curl -fsSL -H "User-Agent: cbm-mcp-installer" "$api_url" 2>/dev/null \
+      | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+      | head -1 | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
   fi
 
-  if [ -z "$VERSION" ]; then
-    detail "API fallback: resolving via redirect..."
-    latest_url=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
-      "https://github.com/${REPO}/releases/latest" || true)
-    VERSION=$(printf '%s\n' "$latest_url" | sed -E 's#^.*/releases/tag/([^/?#]+).*$#\1#')
-    if [ -z "$VERSION" ] || [ "$VERSION" = "$latest_url" ]; then
-      die "Failed to resolve latest GitHub Release for ${REPO}"
-    fi
+  if [ -n "$tag" ]; then
+    printf '%s' "$tag"
+    return 0
   fi
+
+  # Fallback: resolve via HTTP redirect
+  local latest_url
+  latest_url=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+    "https://github.com/${1}/releases/latest" 2>/dev/null || true)
+  tag=$(printf '%s\n' "$latest_url" | sed -E 's#^.*/releases/tag/([^/?#]+).*$#\1#')
+  if [ -n "$tag" ] && [ "$tag" != "$latest_url" ]; then
+    printf '%s' "$tag"
+    return 0
+  fi
+
+  return 1
+}
+
+if [ "$VERSION" = "latest" ]; then
+  detail "Resolving latest release from GitHub API..."
+  VERSION=$(resolve_version "$REPO") || die "Failed to resolve latest GitHub Release for ${REPO}"
   detail "Resolved version: ${VERSION}"
 fi
 
