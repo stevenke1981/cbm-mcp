@@ -21,13 +21,16 @@ CRITICAL - Code Discovery Protocol (cbm):
    - search_graph to find functions, classes, routes
    - trace_path for call chains and data flow
    - get_code_snippet for exact symbol source
+   - query_graph for precise graph/database questions
+   - get_architecture for repository maps
+   - search_code for graph-assisted source search
 2. Project names use cbm+ prefix (legacy cbrlm+ accepted).
 3. For huge logs / non-code blobs: use separate rlm-mcp (rlm_scan, rlm_peek, rlm_chunk).
 4. Use Grep/Glob/Read for configs; always Read a file before editing it.
 5. If the project is not indexed yet, run index_repository FIRST.";
 
 pub const CODEX_SESSION_REMINDER_CMD: &str = "\
-echo \"Code discovery: prefer cbm (search_graph, trace_path, get_code_snippet) over grep/file-read; projects use cbm+ prefix; run index_repository first if not indexed. For long logs use rlm-mcp.\"";
+echo \"Code discovery: prefer cbm (search_graph, trace_path, get_code_snippet, query_graph, get_architecture, search_code) over grep/file-read; projects use cbm+ prefix; run index_repository first if not indexed. For long logs use rlm-mcp.\"";
 
 pub const CODEX_HOOK_BEGIN: &str = "# >>> cbm SessionStart >>>";
 pub const CODEX_HOOK_END: &str = "# <<< cbm SessionStart <<<";
@@ -242,6 +245,10 @@ mod tests {
     #[test]
     fn session_reminder_mentions_server() {
         assert!(SESSION_REMINDER.contains("cbm"));
+        assert!(SESSION_REMINDER.contains("query_graph"));
+        assert!(SESSION_REMINDER.contains("get_architecture"));
+        assert!(SESSION_REMINDER.contains("search_code"));
+        assert!(CODEX_SESSION_REMINDER_CMD.contains("query_graph"));
         assert!(!SESSION_REMINDER.contains("rlm_filter"));
     }
 }

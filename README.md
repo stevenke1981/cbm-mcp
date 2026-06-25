@@ -33,7 +33,7 @@ cd D:\cbm-mcp
 .\install.ps1
 ```
 
-This downloads the latest release archive, verifies `SHA256SUMS.txt`, installs the binary to a stable config path, installs agent MCP config, and writes the session hooks.
+This downloads the latest release archive, verifies `SHA256SUMS.txt`, installs the binary to a stable config path, installs agent MCP config, writes agent hooks, installs the OpenCode plugin, and installs the `codebase-memory` skill.
 
 The installer uses `GITHUB_TOKEN` or `GH_TOKEN` when available. If the GitHub
 API is rate-limited, it resolves the latest tag through the public Release
@@ -165,6 +165,13 @@ Use [`packaging/mcp/`](packaging/mcp/) for ready templates:
 Replace `{{CBM_BINARY}}` with the absolute path printed by `install.ps1` / `install.sh`, or use the stable installed binary path.
 
 Windows installs the executable as `%USERPROFILE%\.config\cbm-mcp\bin\cbm.exe`. The installer updates both existing `opencode.json` and `opencode.jsonc` files so stale legacy entries cannot override the new command.
+
+The installer also adds proactive agent layers:
+
+- Claude Code: `PreToolUse` Grep/Glob graph context and `SessionStart` reminder hooks.
+- Codex: `SessionStart` reminder hook in `~/.codex/config.toml`.
+- OpenCode: global plugin at `~/.config/opencode/plugins/cbm-codebase-memory.js` using `tool.execute.before` and `experimental.chat.system.transform`.
+- Skills: `codebase-memory/SKILL.md` under OpenCode, Claude-compatible, `.agents`, and Codex global skill directories.
 
 ## Troubleshooting
 

@@ -16,7 +16,7 @@ provided by the official Rust MCP SDK (`rmcp 1.7.0`).
 .\install.ps1
 ```
 
-The checkout installer downloads the latest GitHub Release binary, verifies checksums, installs agent MCP config, and writes hooks. It does not compile Rust. Use `.\install.ps1 -FromSource` only for local unreleased development.
+The checkout installer downloads the latest GitHub Release binary, verifies checksums, installs agent MCP config, writes hooks, installs the OpenCode plugin, and installs the `codebase-memory` skill. It does not compile Rust. Use `.\install.ps1 -FromSource` only for local unreleased development.
 
 ## Manual config
 
@@ -30,6 +30,15 @@ The checkout installer downloads the latest GitHub Release binary, verifies chec
 | `dual-servers.example.json` | Optional second server: `rlm-mcp` |
 
 Replace `{{CBM_BINARY}}` with an absolute binary path.
+
+## Proactive layers
+
+The binary installer configures more than the MCP server entry:
+
+- Claude Code: `PreToolUse` Grep/Glob graph context and `SessionStart` reminder hooks.
+- Codex: `SessionStart` reminder hook.
+- OpenCode: `~/.config/opencode/plugins/cbm-codebase-memory.js`, loaded by OpenCode's plugin directory.
+- Skills: `codebase-memory/SKILL.md` in OpenCode, Claude-compatible, `.agents`, and Codex global skill directories.
 
 ## Environment
 

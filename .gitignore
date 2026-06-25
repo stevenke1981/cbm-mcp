@@ -2,3 +2,4 @@
 /dist
 /release-assets
 .opencode/
+.codebase-memory/

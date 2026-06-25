@@ -43,6 +43,22 @@
       "packaging/mcp/codex-config.toml",
       "packaging/mcp/opencode.json",
       "packaging/mcp/claude-settings.json"
+    ],
+    "hooks": {
+      "claude_code": [
+        "PreToolUse:Grep|Glob",
+        "SessionStart:startup|resume|clear|compact"
+      ],
+      "codex": [
+        "SessionStart:startup|resume|clear|compact"
+      ],
+      "opencode_plugin": "~/.config/opencode/plugins/cbm-codebase-memory.js"
+    },
+    "skills": [
+      "~/.config/opencode/skills/codebase-memory/SKILL.md",
+      "~/.claude/skills/codebase-memory/SKILL.md",
+      "~/.agents/skills/codebase-memory/SKILL.md",
+      "~/.codex/skills/codebase-memory/SKILL.md"
     ]
   }
 }
