@@ -20,6 +20,15 @@ fn manifest_points_agents_at_release_installers() {
     assert!(install["windows_installer_url"]
         .as_str()
         .is_some_and(|url| url.contains("/packaging/windows/install.ps1")));
+    assert_eq!(
+        install["hooks"]["opencode_plugin"].as_str(),
+        Some("~/.config/opencode/plugins/cbm-codebase-memory.js")
+    );
+    assert!(install["skills"]
+        .as_array()
+        .is_some_and(|skills| skills.iter().any(|skill| skill
+            .as_str()
+            .is_some_and(|path| path.contains("codebase-memory/SKILL.md")))));
 }
 
 #[test]

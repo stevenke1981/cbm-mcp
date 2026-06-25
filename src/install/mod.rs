@@ -26,6 +26,7 @@ pub struct InstallReport {
     pub configured: Vec<String>,
     pub skipped: Vec<String>,
     pub hooks_installed: bool,
+    pub skills_installed: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -125,11 +126,24 @@ pub fn run_install(opts: &InstallOptions) -> Result<InstallReport> {
         }
     };
 
+    let skills_installed = match install_codebase_memory_skill(opts) {
+        Ok(true) => {
+            eprintln!("installed skill: codebase-memory");
+            true
+        }
+        Ok(false) => false,
+        Err(e) => {
+            eprintln!("skill: skipped ({e})");
+            false
+        }
+    };
+
     Ok(InstallReport {
         binary_path: installed,
         configured,
         skipped,
         hooks_installed,
+        skills_installed,
     })
 }
 
@@ -166,7 +180,8 @@ pub fn run_uninstall(opts: &UninstallOptions) -> Result<UninstallReport> {
     }
 
     if opts.dry_run {
-        eprintln!("[dry-run] would remove hooks from Claude/Codex configs");
+        eprintln!("[dry-run] would remove hooks from Claude/Codex/OpenCode configs");
+        eprintln!("[dry-run] would remove codebase-memory skill files");
         eprintln!("[dry-run] would remove {}", hooks_dir().display());
     } else {
         if remove_claude_hooks().is_ok() {
@@ -174,6 +189,12 @@ pub fn run_uninstall(opts: &UninstallOptions) -> Result<UninstallReport> {
         }
         if remove_codex_hooks().is_ok() {
             removed.push("Codex hooks".into());
+        }
+        if remove_opencode_hooks().is_ok() {
+            removed.push("OpenCode hooks".into());
+        }
+        if remove_codebase_memory_skill().is_ok() {
+            removed.push("codebase-memory skill".into());
         }
         let _ = fs::remove_dir_all(hooks_dir());
         if !opts.keep_binary {
@@ -611,6 +632,8 @@ fn write_codex_config(path: &Path, binary: &Path, agent: AgentKind) -> Result<bo
 
 const HOOK_GATE_PS1: &str = include_str!("../../hooks/cbm-code-discovery-gate.ps1");
 const HOOK_GATE_SH: &str = include_str!("../../hooks/cbm-code-discovery-gate.sh");
+const OPENCODE_PLUGIN_JS: &str = include_str!("../../hooks/cbm-opencode-plugin.js");
+const CODEBASE_MEMORY_SKILL: &str = include_str!("../../skills/codebase-memory/SKILL.md");
 
 fn install_hooks(binary: &Path, opts: &InstallOptions) -> Result<bool> {
     if opts.dry_run {
@@ -620,6 +643,7 @@ fn install_hooks(binary: &Path, opts: &InstallOptions) -> Result<bool> {
         );
         configure_claude_hooks(binary, opts)?;
         configure_codex_hooks(opts)?;
+        configure_opencode_hooks(binary, opts)?;
         return Ok(true);
     }
 
@@ -661,6 +685,7 @@ fn install_hooks(binary: &Path, opts: &InstallOptions) -> Result<bool> {
 
     configure_claude_hooks(binary, opts)?;
     configure_codex_hooks(opts)?;
+    configure_opencode_hooks(binary, opts)?;
     Ok(true)
 }
 
@@ -674,11 +699,34 @@ fn configure_claude_hooks(binary: &Path, opts: &InstallOptions) -> Result<()> {
         return Ok(());
     }
     let gate = hook_command(binary, "cbm-code-discovery-gate");
-    upsert_claude_hooks_gate_only(&settings, &gate)
+    let session = hook_binary_command(binary, "hook-session-start");
+    upsert_claude_hooks(&settings, &gate, &session)
 }
 
-fn configure_codex_hooks(_opts: &InstallOptions) -> Result<()> {
-    Ok(())
+fn configure_codex_hooks(opts: &InstallOptions) -> Result<()> {
+    let config = dirs::home_dir()
+        .map(|h| h.join(".codex").join("config.toml"))
+        .ok_or_else(|| Error::Other("home directory not found".into()))?;
+    if opts.dry_run {
+        eprintln!(
+            "[dry-run] would configure Codex SessionStart hook in {}",
+            config.display()
+        );
+        return Ok(());
+    }
+    upsert_codex_session_hooks(&config)
+}
+
+fn configure_opencode_hooks(binary: &Path, opts: &InstallOptions) -> Result<()> {
+    let plugin = opencode_plugin_path();
+    if opts.dry_run {
+        eprintln!(
+            "[dry-run] would install OpenCode plugin to {}",
+            plugin.display()
+        );
+        return Ok(());
+    }
+    write_opencode_plugin_to(&plugin, binary)
 }
 
 fn claude_settings_path() -> PathBuf {
@@ -697,6 +745,117 @@ fn hook_command(_binary: &Path, script_base: &str) -> String {
     }
 }
 
+fn hook_binary_command(binary: &Path, arg: &str) -> String {
+    if cfg!(windows) {
+        format!(
+            "pwsh -NoProfile -Command \"& '{}' {}\"",
+            powershell_single_quoted(binary),
+            arg
+        )
+    } else {
+        format!("\"{}\" {arg}", binary.display())
+    }
+}
+
+fn powershell_single_quoted(path: &Path) -> String {
+    path.to_string_lossy().replace('\'', "''")
+}
+
+fn opencode_config_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("OPENCODE_CONFIG_DIR") {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".config")
+        .join("opencode")
+}
+
+fn opencode_plugin_path() -> PathBuf {
+    opencode_config_dir()
+        .join("plugins")
+        .join("cbm-codebase-memory.js")
+}
+
+fn write_opencode_plugin_to(plugin: &Path, binary: &Path) -> Result<()> {
+    let bin = binary.to_string_lossy().replace('\\', "/");
+    let content = OPENCODE_PLUGIN_JS.replace("{{CBM_BIN}}", &bin);
+    if let Some(parent) = plugin.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(plugin, content)?;
+    Ok(())
+}
+
+fn skill_targets() -> Vec<PathBuf> {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    vec![
+        opencode_config_dir()
+            .join("skills")
+            .join("codebase-memory")
+            .join("SKILL.md"),
+        home.join(".claude")
+            .join("skills")
+            .join("codebase-memory")
+            .join("SKILL.md"),
+        home.join(".agents")
+            .join("skills")
+            .join("codebase-memory")
+            .join("SKILL.md"),
+        home.join(".codex")
+            .join("skills")
+            .join("codebase-memory")
+            .join("SKILL.md"),
+    ]
+}
+
+fn install_codebase_memory_skill(opts: &InstallOptions) -> Result<bool> {
+    let targets = skill_targets();
+    if opts.dry_run {
+        for target in targets {
+            eprintln!("[dry-run] would install skill to {}", target.display());
+        }
+        return Ok(true);
+    }
+    for target in targets {
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(target, CODEBASE_MEMORY_SKILL)?;
+    }
+    Ok(true)
+}
+
+fn remove_opencode_hooks() -> Result<()> {
+    for path in [
+        opencode_plugin_path(),
+        opencode_config_dir()
+            .join("plugins")
+            .join("cbm-opencode-plugin.js"),
+    ] {
+        if path.exists() {
+            fs::remove_file(path)?;
+        }
+    }
+    Ok(())
+}
+
+fn remove_codebase_memory_skill() -> Result<()> {
+    for target in skill_targets() {
+        if target.exists() {
+            fs::remove_file(&target)?;
+        }
+        if let Some(parent) = target.parent() {
+            let _ = fs::remove_dir(parent);
+        }
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
 fn upsert_claude_hooks_gate_only(settings_path: &Path, gate_cmd: &str) -> Result<()> {
     let mut root: Map<String, Value> = if settings_path.exists() {
         serde_json::from_str(&fs::read_to_string(settings_path)?)?
@@ -747,7 +906,6 @@ fn upsert_claude_hooks_gate_only(settings_path: &Path, gate_cmd: &str) -> Result
     Ok(())
 }
 
-#[allow(dead_code)]
 fn upsert_claude_hooks(settings_path: &Path, gate_cmd: &str, session_cmd: &str) -> Result<()> {
     let mut root: Map<String, Value> = if settings_path.exists() {
         serde_json::from_str(&fs::read_to_string(settings_path)?)?
@@ -829,14 +987,20 @@ fn upsert_claude_hooks(settings_path: &Path, gate_cmd: &str, session_cmd: &str) 
     Ok(())
 }
 
-#[allow(dead_code)]
 fn upsert_codex_session_hooks(config_path: &Path) -> Result<()> {
-    let mut content = fs::read_to_string(config_path)?;
+    let mut content = if config_path.exists() {
+        fs::read_to_string(config_path)?
+    } else {
+        String::new()
+    };
     let block = format!(
         "\n{CODEX_HOOK_BEGIN}\n[[hooks.SessionStart]]\nmatcher = \"startup|resume|clear|compact\"\n\n[[hooks.SessionStart.hooks]]\ntype = \"command\"\ncommand = '{CODEX_SESSION_REMINDER_CMD}'\n{CODEX_HOOK_END}\n"
     );
     content = remove_codex_hook_block(&content);
     content = content.trim_end().to_string() + &block;
+    if let Some(parent) = config_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     fs::write(config_path, content)?;
     Ok(())
 }
@@ -1160,6 +1324,77 @@ mod tests {
         let parsed: Value = serde_json::from_str(&fs::read_to_string(&cfg).unwrap()).unwrap();
         assert!(parsed["mcpServers"][MCP_SERVER_NAME].is_object());
         assert!(parsed["hooks"].is_object());
+    }
+
+    #[test]
+    fn claude_hooks_include_pre_tool_and_session_start() {
+        let dir = TempDir::new().unwrap();
+        let cfg = dir.path().join("settings.json");
+        fs::write(
+            &cfg,
+            r#"{"hooks":{"PreToolUse":[{"matcher":"Old","hooks":[{"command":"cbrlm-code-discovery-gate"}]}]}}"#,
+        )
+        .unwrap();
+
+        upsert_claude_hooks(&cfg, "gate-cmd", "session-cmd").unwrap();
+        let parsed: Value = serde_json::from_str(&fs::read_to_string(&cfg).unwrap()).unwrap();
+
+        let pre = parsed["hooks"]["PreToolUse"].as_array().unwrap();
+        assert_eq!(pre.len(), 1);
+        assert_eq!(pre[0]["matcher"], "Grep|Glob");
+        assert_eq!(pre[0]["hooks"][0]["command"], "gate-cmd");
+
+        let session = parsed["hooks"]["SessionStart"].as_array().unwrap();
+        assert_eq!(session.len(), 4);
+        assert!(session
+            .iter()
+            .all(|entry| entry["hooks"][0]["command"] == "session-cmd"));
+    }
+
+    #[test]
+    fn codex_session_hook_can_create_config() {
+        let dir = TempDir::new().unwrap();
+        let cfg = dir.path().join(".codex").join("config.toml");
+
+        upsert_codex_session_hooks(&cfg).unwrap();
+        let text = fs::read_to_string(&cfg).unwrap();
+
+        assert!(text.contains(CODEX_HOOK_BEGIN));
+        assert!(text.contains("[[hooks.SessionStart]]"));
+        assert!(text.contains(CODEX_SESSION_REMINDER_CMD));
+    }
+
+    #[test]
+    fn opencode_plugin_template_installs_hooks() {
+        let dir = TempDir::new().unwrap();
+        let plugin = dir.path().join("plugins").join("cbm-codebase-memory.js");
+        let bin = PathBuf::from("C:/Users/test/.config/cbm-mcp/bin/cbm.exe");
+
+        write_opencode_plugin_to(&plugin, &bin).unwrap();
+        let text = fs::read_to_string(&plugin).unwrap();
+
+        assert!(text.contains("\"tool.execute.before\""));
+        assert!(text.contains("\"experimental.chat.system.transform\""));
+        assert!(text.contains("query_graph"));
+        assert!(text.contains("get_architecture"));
+        assert!(text.contains("search_code"));
+        assert!(text.contains("C:/Users/test/.config/cbm-mcp/bin/cbm.exe"));
+        assert!(!text.contains("{{CBM_BIN}}"));
+    }
+
+    #[test]
+    fn codebase_memory_skill_has_valid_frontmatter() {
+        assert!(CODEBASE_MEMORY_SKILL.starts_with("---\n"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("name: codebase-memory"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("description:"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("Quick Decision Matrix"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("Tracing Workflow"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("Quality Analysis"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("Tool Reference"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("search_graph"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("index_repository"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("ingest_traces"));
+        assert!(CODEBASE_MEMORY_SKILL.contains("Edge Types"));
     }
 
     #[test]
