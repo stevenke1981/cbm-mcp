@@ -4,7 +4,7 @@
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/install.sh | bash
 #   curl -fsSL https://raw.githubusercontent.com/stevenke1981/cbm-mcp/main/install.sh | bash -s -- --uninstall
-#   CBM_VERSION=v0.2.3 bash <(curl -fsSL ...)
+#   CBM_VERSION=v0.2.4 bash <(curl -fsSL ...)
 #   ./packaging/linux/install.sh --prefix ~/.local/bin
 #
 # Environment variables:

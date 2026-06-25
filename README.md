@@ -50,11 +50,11 @@ Unix:
 Pin a version:
 
 ```powershell
-.\install.ps1 -Version v0.2.3
+.\install.ps1 -Version v0.2.4
 ```
 
 ```bash
-CBM_VERSION=v0.2.3 ./install.sh
+CBM_VERSION=v0.2.4 ./install.sh
 ```
 
 ### Build from source checkout

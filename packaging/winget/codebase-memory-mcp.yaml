@@ -1,6 +1,6 @@
 # winget manifest template — update PackageIdentifier and InstallerSha256 on release
 PackageIdentifier: CbmMcp.Cbm
-PackageVersion: 0.2.3
+PackageVersion: 0.2.4
 PackageLocale: en-US
 Publisher: CBM Contributors
 PackageName: cbm
@@ -15,7 +15,7 @@ Tags:
 Installers:
   - Architecture: x64
     InstallerType: zip
-    InstallerUrl: https://github.com/stevenke1981/cbm-mcp/releases/download/v0.2.3/cbm-mcp-windows-x64.zip
+    InstallerUrl: https://github.com/stevenke1981/cbm-mcp/releases/download/v0.2.4/cbm-mcp-windows-x64.zip
     InstallerSha256: PLACEHOLDER
     NestedInstallerType: portable
     NestedInstallerFiles:

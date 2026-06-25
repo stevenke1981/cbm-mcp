@@ -6,7 +6,7 @@
 #
 # Options (via -s --):
 #   curl ... | bash -s -- --uninstall
-#   curl ... | bash -s -- --version v0.2.3
+#   curl ... | bash -s -- --version v0.2.4
 #   curl ... | bash -s -- --prefix ~/.local/bin
 #
 # From a local clone:

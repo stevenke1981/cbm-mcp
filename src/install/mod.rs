@@ -1384,7 +1384,10 @@ mod tests {
 
     #[test]
     fn codebase_memory_skill_has_valid_frontmatter() {
-        assert!(CODEBASE_MEMORY_SKILL.starts_with("---\n"));
+        assert!(
+            CODEBASE_MEMORY_SKILL.starts_with("---\n")
+                || CODEBASE_MEMORY_SKILL.starts_with("---\r\n")
+        );
         assert!(CODEBASE_MEMORY_SKILL.contains("name: codebase-memory"));
         assert!(CODEBASE_MEMORY_SKILL.contains("description:"));
         assert!(CODEBASE_MEMORY_SKILL.contains("Quick Decision Matrix"));
